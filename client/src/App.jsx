@@ -1,12 +1,12 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import RootRedirect from './components/RootRedirect';
 import Login from './Login';
 
 import AdminApp from './admin/AdminApp';
-import StudentApp from './student/StudentApp';
+//import StudentApp from './student/StudentApp';
 import StaffApp from './staff/StaffApp';
-import CvhtApp from './advisor/AdvisorApp';
+//import CvhtApp from './advisor/AdvisorApp';
 
 function App() {
   return (
@@ -19,24 +19,24 @@ function App() {
         <Route path="/" element={<RootRedirect />} />
         
     
-        <Route 
+        {/* <Route 
           path="/student/*" 
           element={
             <ProtectedRoute requiredRole="student">
               <StudentApp />
             </ProtectedRoute>
           } 
-        />
+        /> */}
         
     
-        <Route 
+        {/* <Route 
           path="/cvht/*" 
           element={
             <ProtectedRoute requiredRole="cvht">
               <CvhtApp />
             </ProtectedRoute>
           } 
-        />
+        /> */}
         
    
         <Route 

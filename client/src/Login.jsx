@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import backgroundImage from '../assets/background.jpg'; 
-import logoImage from '../assets/Logo.png';
+import backgroundImage from './assets/background.jpg'; 
+import logoImage from './assets/Logo.png';
 
 function Login() {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ function Login() {
     
     try {
       const roleConfig = getRoleConfig(activeRole);
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const API_URL =  'http://localhost:5000';
       
       const response = await axios.post(
         `${API_URL}/api/auth/login${roleConfig.endpoint}`,
