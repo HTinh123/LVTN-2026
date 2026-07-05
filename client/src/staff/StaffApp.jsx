@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
 import StaffHeader from '../layout/StaffHeader';
-import PageWrapper from '../components/PageWrapper';
-//import StudentList from './StudentList';
+import StudentList from './StudentList';
 import AdvisorList from './AdvisorList';
+import ClassList from './ClassList';
+import KhoaList from './KhoaList';
+import DanhmucList from './DanhmucList';
+import LoaiList from './LoaiList';
+import TieuchiList from './TieuchiList';
 
 
 function StaffApp() {
@@ -30,6 +34,7 @@ function StaffApp() {
     const path = location.pathname;
     if (path.includes('/staff/students')) return 'students';
     if (path.includes('/staff/advisors')) return 'advisors';
+    if (path.includes('/staff/categories')) return 'categories';
     return 'dashboard';
   };
 
@@ -48,6 +53,15 @@ function StaffApp() {
       case 'advisors':
         navigate('/staff/advisors');
         break;
+        case 'classes':
+        navigate('/staff/classes');
+        break;
+        case 'departments':
+        navigate('/staff/departments');
+        break;
+        case 'categories':
+        navigate('/staff/danhmuc');
+        break;
       default:
         navigate('/staff');
     }
@@ -62,7 +76,7 @@ function StaffApp() {
       />
 
       <div className="py-6 sm:px-6 lg:px-8">
-        <PageWrapper>
+        {/*  */}
           <Routes>
             {/* Dashboard Route */}
             <Route path="/" element={
@@ -70,9 +84,7 @@ function StaffApp() {
                 <h2 className="text-2xl font-semibold text-gray-700 mb-4">
                   Welcome, {user.hoten || user.username || 'Staff'}!
                 </h2>
-                <p className="text-gray-600 mb-6">
-                  This is your staff dashboard. Use the navigation menu to manage students and advisors.
-                </p>
+                
               </div>
             } />
 
@@ -82,7 +94,7 @@ function StaffApp() {
                 <h2 className="text-2xl font-semibold text-gray-700 mb-4">
                   Students Management
                 </h2>
-                
+                <StudentList />
               
               </div>
             } />
@@ -97,6 +109,63 @@ function StaffApp() {
                 <AdvisorList />
               </div>
             } />
+
+            {/* Classes Management Route */}
+            <Route path="/classes" element={
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-2xl font-semibold text-gray-700 mb-4">
+                  Classes Management
+                </h2>
+                <ClassList />
+              </div>
+            } />
+
+            {/* Departments Management Route */}
+            <Route path="/departments" element={
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-2xl font-semibold text-gray-700 mb-4">
+                  Departments Management
+                </h2>
+                <KhoaList />
+              </div>
+            } />
+
+                     {/* Danhmuc List - Parent Route */}
+          <Route 
+            path="/danhmuc" 
+            element={
+        
+                <div className="bg-white shadow rounded-lg p-6">
+                  <DanhmucList />
+                </div>
+          
+            } 
+          />
+
+          {/* Loai List - Nested Route for specific Danhmuc */}
+          <Route 
+            path="/danhmuc/:ms_danhmuc/loai" 
+            element={
+           
+                <div className="bg-white shadow rounded-lg p-6">
+                  <LoaiList />
+                </div>
+            
+            } 
+          />
+
+          {/* Tieuchi List - Nested Route for specific Loai */}
+          <Route 
+            path="/danhmuc/:ms_danhmuc/loai/:ms_loai/tieuchi" 
+            element={
+             
+                <div className="bg-white shadow rounded-lg p-6">
+                  <TieuchiList />
+                </div>
+              
+            } 
+          />
+
 
             {/* 404 Route */}
             <Route path="*" element={
@@ -116,7 +185,7 @@ function StaffApp() {
               </div>
             } />
           </Routes>
-        </PageWrapper>
+        {/*  */}
       </div>
     </div>
   );

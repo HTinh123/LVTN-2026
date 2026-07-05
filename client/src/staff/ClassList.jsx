@@ -1,38 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import PageWrapper from '../components/PageWrapper';
 
 const BASE_URL =  'http://localhost:5000';
 
-function AdvisorList() {
-  const [advisors, setAdvisors] = useState([]);
-  const [stats, setStats] = useState({
-    totalAdvisors: 0,
-    totalClasses: 0,
-  });
+function ClassList() {
+  const [classes, setClasses] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [departmentStats, setDepartmentStats] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [chartData, setChartData] = useState([]);
+  const [successMessage, setSuccessMessage] = useState('');
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState(''); // 'add', 'password', 'delete'
-  const [selectedAdvisor, setSelectedAdvisor] = useState(null);
+  const [modalMode, setModalMode] = useState(''); // 'add', 'edit', 'delete'
+  const [selectedClass, setSelectedClass] = useState(null);
   
-  // Form data for adding advisor
+  // Form data for adding/editing class
   const [formData, setFormData] = useState({
-    ms_cvht: '',
-    hoten: '',
-    username: '',
-    password: ''
-  });
-  
-  // Password reset form
-  const [passwordData, setPasswordData] = useState({
-    newPassword: ''
+    mslop: '',
+    ms_khoa: ''
   });
   
   const [warningMessage, setWarningMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   // Helper function to get auth headers
   const getAuthHeaders = () => {
@@ -43,89 +35,135 @@ function AdvisorList() {
     };
   };
 
-  // Fetch advisors on component mount
+  // Fetch departments and stats on component mount
   useEffect(() => {
-    fetchAdvisors();
-    fetchChartData();
+    fetchDepartments();
+    fetchDepartmentStats();
   }, []);
 
-  // Recalculate stats whenever advisors changes
+  // Fetch classes when department changes
   useEffect(() => {
-    calculateStats(advisors);
-  }, [advisors]);
+    if (selectedDepartment) {
+      fetchClassesByDepartment(selectedDepartment);
+    } else {
+      fetchAllClasses();
+    }
+  }, [selectedDepartment]);
 
-  const fetchAdvisors = async () => {
-    setLoading(true);
-    setError('');
+  // Fetch all departments
+  const fetchDepartments = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/staff/cvht`, {
+      const res = await fetch(`${BASE_URL}/api/staff/departments`, {
         headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.success) {
-        setAdvisors(data.data || []);
+        setDepartments(data.data || []);
       } else {
-        setError(data.error || 'Failed to fetch advisors');
+        setError(data.error || 'Failed to fetch departments');
       }
     } catch (err) {
-      setError('Failed to fetch advisors. Please check your connection.');
-      console.error('Fetch advisors error:', err);
+      setError('Failed to fetch departments. Please check your connection.');
+      console.error('Fetch departments error:', err);
+    }
+  };
+
+  // Fetch department statistics with class counts
+  const fetchDepartmentStats = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/staff/khoa/with-counts`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDepartmentStats(data.data || []);
+      }
+    } catch (err) {
+      console.error('Fetch department stats error:', err);
+    }
+  };
+
+  // Fetch all classes
+  const fetchAllClasses = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${BASE_URL}/api/staff/classes`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        setClasses(data.data || []);
+      } else {
+        setError(data.error || 'Failed to fetch classes');
+      }
+    } catch (err) {
+      setError('Failed to fetch classes. Please check your connection.');
+      console.error('Fetch classes error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchChartData = async () => {
+  // Fetch classes by department
+  const fetchClassesByDepartment = async (ms_khoa) => {
+    setLoading(true);
+    setError('');
     try {
-      const res = await fetch(`${BASE_URL}/api/staff/cvht/class-stats`, {
+      const res = await fetch(`${BASE_URL}/api/staff/departments/${ms_khoa}/classes`, {
         headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.success) {
-        setChartData(data.data || []);
+        setClasses(data.data || []);
+      } else {
+        setClasses([]);
+        setError(data.error || 'No classes found for this department');
       }
     } catch (err) {
-      console.error('Fetch chart data error:', err);
+      setClasses([]);
+      setError('Failed to fetch classes. Please check your connection.');
+      console.error('Fetch classes error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const calculateStats = (advisorData) => {
-    const totalAdvisors = advisorData.length;
-    // Calculate total classes from chart data or from API
-    const totalClasses = chartData.reduce((sum, item) => sum + item.classCount, 0);
-    setStats({
-      totalAdvisors: totalAdvisors,
-      totalClasses: totalClasses,
-    });
+  // Handle department change
+  const handleDepartmentChange = (e) => {
+    const value = e.target.value;
+    setSelectedDepartment(value);
+    setClasses([]); // Clear classes while loading
   };
 
-  // Handle adding new advisor
-  const handleAddAdvisor = () => {
+  // Handle add new class
+  const handleAddClass = () => {
     setModalMode('add');
     setFormData({
-      ms_cvht: '',
-      hoten: '',
-      username: '',
-      password: ''
+      mslop: '',
+      ms_khoa: selectedDepartment || ''
     });
-    setWarningMessage('You are about to create a new CVHT account. Please fill in all required fields.');
+    setWarningMessage('You are about to create a new class. Please fill in all required fields.');
     setShowModal(true);
   };
 
-  // Handle reset password
-  const handleResetPassword = (advisor) => {
-    setModalMode('password');
-    setSelectedAdvisor(advisor);
-    setPasswordData({ newPassword: '' });
-    setWarningMessage(`You are about to reset the password for CVHT "${advisor.hoten}" (${advisor.username}). This action cannot be undone.`);
+  // Handle edit class
+  const handleEditClass = (classItem) => {
+    setModalMode('edit');
+    setSelectedClass(classItem);
+    setFormData({
+      mslop: classItem.mslop,
+      ms_khoa: classItem.ms_khoa
+    });
+    setWarningMessage(`You are about to edit class "${classItem.mslop}".`);
     setShowModal(true);
   };
 
-  // Handle delete advisor
-  const handleDeleteAdvisor = (advisor) => {
+  // Handle delete class
+  const handleDeleteClass = (classItem) => {
     setModalMode('delete');
-    setSelectedAdvisor(advisor);
-    setWarningMessage(`Are you sure you want to delete CVHT "${advisor.hoten}" (${advisor.username})? This action cannot be undone.`);
+    setSelectedClass(classItem);
+    setWarningMessage(`Are you sure you want to delete class "${classItem.mslop}"? This action cannot be undone.`);
     setShowModal(true);
   };
 
@@ -142,19 +180,24 @@ function AdvisorList() {
 
       switch (modalMode) {
         case 'add':
-          url = `${BASE_URL}/api/auth/cvht/register`;
+          url = `${BASE_URL}/api/staff/lop`;
           method = 'POST';
-          body = formData;
+          body = {
+            mslop: formData.mslop,
+            ms_khoa: formData.ms_khoa
+          };
           break;
           
-        case 'password':
-          url = `${BASE_URL}/api/staff/cvht/${selectedAdvisor.ms_cvht}/reset-password`;
-          method = 'POST';
-          body = { newPassword: passwordData.newPassword };
+        case 'edit':
+          url = `${BASE_URL}/api/staff/lop/${selectedClass.mslop}`;
+          method = 'PUT';
+          body = {
+            ms_khoa: formData.ms_khoa
+          };
           break;
           
         case 'delete':
-          url = `${BASE_URL}/api/staff/cvht/${selectedAdvisor.ms_cvht}`;
+          url = `${BASE_URL}/api/staff/lop/${selectedClass.mslop}`;
           method = 'DELETE';
           body = {};
           break;
@@ -173,8 +216,13 @@ function AdvisorList() {
       
       if (data.success) {
         setSuccessMessage(data.message || 'Operation completed successfully');
-        fetchAdvisors(); // Refresh the list
-        fetchChartData(); // Refresh chart data
+        // Refresh the list based on current filter
+        if (selectedDepartment) {
+          fetchClassesByDepartment(selectedDepartment);
+        } else {
+          fetchAllClasses();
+        }
+        fetchDepartmentStats(); // Refresh chart data
         setShowModal(false);
         
         // Clear success message after 3 seconds
@@ -192,34 +240,21 @@ function AdvisorList() {
     }
   };
 
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // Colors for chart
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
-  // Custom colors for the chart
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-
-  if (loading && advisors.length === 0) {
+  if (loading && classes.length === 0 && !selectedDepartment) {
     return (
-      
+      <PageWrapper>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
-      
+      </PageWrapper>
     );
   }
 
   return (
-    
+    <PageWrapper>
       <div className="space-y-6">
         {/* Success message */}
         {successMessage && (
@@ -263,20 +298,24 @@ function AdvisorList() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-4">
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <dt className="text-sm font-medium text-gray-500 truncate">Total CVHT</dt>
-              <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.totalAdvisors}</dd>
-            </div>
-          </div>
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
               <dt className="text-sm font-medium text-gray-500 truncate">Total Classes</dt>
-              <dd className="mt-1 text-3xl font-semibold text-blue-600">{stats.totalClasses}</dd>
+              <dd className="mt-1 text-3xl font-semibold text-gray-900">{classes.length}</dd>
             </div>
           </div>
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <dt className="text-sm font-medium text-gray-500 truncate">Active CVHT</dt>
-              <dd className="mt-1 text-3xl font-semibold text-green-600">{stats.totalAdvisors}</dd>
+              <dt className="text-sm font-medium text-gray-500 truncate">Departments</dt>
+              <dd className="mt-1 text-3xl font-semibold text-blue-600">{departments.length}</dd>
+            </div>
+          </div>
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <dt className="text-sm font-medium text-gray-500 truncate">Filter</dt>
+              <dd className="mt-1 text-sm text-gray-600">
+                {selectedDepartment ? 
+                  departments.find(d => d.ms_khoa === selectedDepartment)?.ten_khoa || 'Filtered' 
+                  : 'All Classes'}
+              </dd>
             </div>
           </div>
           <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -284,27 +323,27 @@ function AdvisorList() {
               <dt className="text-sm font-medium text-gray-500 truncate">Actions</dt>
               <dd className="mt-1">
                 <button
-                  onClick={handleAddAdvisor}
+                  onClick={handleAddClass}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                   </svg>
-                  Add CVHT
+                  Add Class
                 </button>
               </dd>
             </div>
           </div>
         </div>
 
-        {/* Chart - Class Distribution by CVHT */}
-        {chartData.length > 0 && (
+        {/* Chart - Classes by Department */}
+        {departmentStats.length > 0 && (
           <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Class Distribution by CVHT</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Classes by Department</h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={chartData}
+                  data={departmentStats}
                   margin={{
                     top: 20,
                     right: 30,
@@ -313,27 +352,45 @@ function AdvisorList() {
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
+                  <XAxis dataKey="ten_khoa" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="classCount" fill="#3B82F6" name="Number of Classes" />
+                  <Bar dataKey="class_count" fill="#3B82F6" name="Number of Classes" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
 
-        {/* CVHT Table */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">CVHT Management</h3>
+        {/* Department Dropdown and Refresh */}
+        <div className="bg-white shadow rounded-lg p-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="w-full sm:w-64">
+              <label className="block text-sm font-medium text-gray-700">Department</label>
+              <select
+                value={selectedDepartment}
+                onChange={handleDepartmentChange}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              >
+                <option value="">All Departments</option>
+                {departments.map(dept => (
+                  <option key={dept.ms_khoa} value={dept.ms_khoa}>
+                    {dept.ten_khoa}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               onClick={() => {
-                fetchAdvisors();
-                fetchChartData();
+                if (selectedDepartment) {
+                  fetchClassesByDepartment(selectedDepartment);
+                } else {
+                  fetchAllClasses();
+                }
+                fetchDepartmentStats();
               }}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <svg className="inline-block h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -341,55 +398,60 @@ function AdvisorList() {
               Refresh
             </button>
           </div>
+        </div>
+
+        {/* Classes Table */}
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
+              Class Management
+              {selectedDepartment && ` - ${departments.find(d => d.ms_khoa === selectedDepartment)?.ten_khoa || ''}`}
+            </h3>
+            <span className="text-sm text-gray-500">{classes.length} class(es)</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CVHT ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {advisors.length === 0 ? (
+                {loading && classes.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
-                      No CVHT members found. Click "Add CVHT" to create one.
+                    <td colSpan="3" className="px-6 py-4 text-center text-sm text-gray-500">
+                      <div className="flex justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : classes.length === 0 ? (
+                  <tr>
+                    <td colSpan="3" className="px-6 py-4 text-center text-sm text-gray-500">
+                      {selectedDepartment ? 'No classes found for this department.' : 'No classes found. Click "Add Class" to create one.'}
                     </td>
                   </tr>
                 ) : (
-                  advisors.map((advisor) => (
-                    <tr key={advisor.ms_cvht} className="hover:bg-gray-50 transition-colors">
+                  classes.map((classItem) => (
+                    <tr key={classItem.mslop} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {advisor.ms_cvht}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.hoten}
+                        {classItem.mslop}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {advisor.username}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          CVHT
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(advisor.created_at)}
+                        {classItem.ten_khoa || classItem.ms_khoa || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
-                          onClick={() => handleResetPassword(advisor)}
+                          onClick={() => handleEditClass(classItem)}
                           className="text-blue-600 hover:text-blue-900 transition-colors"
                         >
-                          Reset Password
+                          Edit
                         </button>
                         <span className="text-gray-300">|</span>
                         <button
-                          onClick={() => handleDeleteAdvisor(advisor)}
+                          onClick={() => handleDeleteClass(classItem)}
                           className="text-red-600 hover:text-red-900 transition-colors"
                         >
                           Delete
@@ -417,17 +479,11 @@ function AdvisorList() {
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="sm:flex sm:items-start">
                     <div className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${
-                      modalMode === 'add' ? 'bg-blue-100' : 
-                      modalMode === 'password' ? 'bg-yellow-100' : 'bg-red-100'
+                      modalMode === 'add' || modalMode === 'edit' ? 'bg-blue-100' : 'bg-red-100'
                     } sm:mx-0 sm:h-10 sm:w-10`}>
-                      {modalMode === 'add' && (
+                      {(modalMode === 'add' || modalMode === 'edit') && (
                         <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                      )}
-                      {modalMode === 'password' && (
-                        <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       )}
                       {modalMode === 'delete' && (
@@ -438,75 +494,45 @@ function AdvisorList() {
                     </div>
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                       <h3 className="text-lg leading-6 font-medium text-gray-900">
-                        {modalMode === 'add' && 'Add New CVHT'}
-                        {modalMode === 'password' && 'Reset Password'}
-                        {modalMode === 'delete' && 'Delete CVHT'}
+                        {modalMode === 'add' && 'Add New Class'}
+                        {modalMode === 'edit' && 'Edit Class'}
+                        {modalMode === 'delete' && 'Delete Class'}
                       </h3>
                       <div className="mt-2">
                         <p className="text-sm text-gray-500">{warningMessage}</p>
                         
-                        {/* Add CVHT Form */}
-                        {modalMode === 'add' && (
+                        {/* Add/Edit Form */}
+                        {(modalMode === 'add' || modalMode === 'edit') && (
                           <div className="mt-4 space-y-3">
+                            {modalMode === 'add' && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Class ID (MSLOP) *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={formData.mslop}
+                                  onChange={(e) => setFormData({ ...formData, mslop: e.target.value })}
+                                  className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                  placeholder="e.g., D20-TH01"
+                                />
+                              </div>
+                            )}
                             <div>
-                              <label className="block text-sm font-medium text-gray-700">CVHT ID (MS_CVHT) *</label>
-                              <input
-                                type="text"
+                              <label className="block text-sm font-medium text-gray-700">Department *</label>
+                              <select
                                 required
-                                value={formData.ms_cvht}
-                                onChange={(e) => setFormData({ ...formData, ms_cvht: e.target.value })}
+                                value={formData.ms_khoa}
+                                onChange={(e) => setFormData({ ...formData, ms_khoa: e.target.value })}
                                 className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="e.g., CVHT001"
-                              />
+                              >
+                                <option value="">Select Department</option>
+                                {departments.map(dept => (
+                                  <option key={dept.ms_khoa} value={dept.ms_khoa}>
+                                    {dept.ten_khoa}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                              <input
-                                type="text"
-                                required
-                                value={formData.hoten}
-                                onChange={(e) => setFormData({ ...formData, hoten: e.target.value })}
-                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="Enter full name"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Username *</label>
-                              <input
-                                type="text"
-                                required
-                                value={formData.username}
-                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="Enter username"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Password *</label>
-                              <input
-                                type="password"
-                                required
-                                value={formData.password}
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="Enter password (min 6 characters)"
-                              />
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Reset Password Form */}
-                        {modalMode === 'password' && (
-                          <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">New Password *</label>
-                            <input
-                              type="password"
-                              required
-                              value={passwordData.newPassword}
-                              onChange={(e) => setPasswordData({ newPassword: e.target.value })}
-                              className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                              placeholder="Enter new password (min 6 characters)"
-                            />
                           </div>
                         )}
                       </div>
@@ -517,14 +543,12 @@ function AdvisorList() {
                   <button
                     onClick={handleSubmit}
                     disabled={
-                      (modalMode === 'add' && (!formData.ms_cvht || !formData.hoten || !formData.username || !formData.password || formData.password.length < 6)) ||
-                      (modalMode === 'password' && (!passwordData.newPassword || passwordData.newPassword.length < 6)) ||
-                      loading
+                      ((modalMode === 'add' && (!formData.mslop || !formData.ms_khoa)) ||
+                       (modalMode === 'edit' && !formData.ms_khoa) ||
+                       loading)
                     }
                     className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${
-                      modalMode === 'add' ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' :
-                      modalMode === 'password' ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' :
-                      'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                      (modalMode === 'add' || modalMode === 'edit') ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {loading ? (
@@ -551,8 +575,8 @@ function AdvisorList() {
           </div>
         )}
       </div>
-    
+    </PageWrapper>
   );
 }
 
-export default AdvisorList;
+export default ClassList;

@@ -5,6 +5,7 @@ require('dotenv').config();
 const authRoutes = require('./route/auth.routes');
 const adminRoutes = require('./route/admin.routes');
 const staffRoutes = require('./route/staff.routes');
+const advisorRoutes = require('./route/advisor.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/advisor', advisorRoutes);
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 

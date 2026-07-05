@@ -22,6 +22,8 @@ router.post('/cvht/register', authController.registerCvht);
 router.post('/student/register', authController.registerStudent);
 router.post('/student/bulk-upload', upload.single('file'), authController.bulkRegisterFromFile);
 
+// Reset student password
+router.post('/students/:mssv/reset-password', authController.resetStudentPassword);
 
 
 module.exports = router;

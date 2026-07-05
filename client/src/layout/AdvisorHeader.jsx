@@ -9,20 +9,18 @@ import {
   FaBell,
   FaSignOutAlt,
   FaSchool,
-  FaBuilding,
-  FaListUl,
 } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import { toast } from 'react-toastify';
 
-const StaffHeader = ({ activeTab, onTabChange, user }) => {
+const AdvisorHeader = ({ activeTab, onTabChange, user }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const navigate = useNavigate();
 
   // Use user prop or fallback to hardcoded values
-  const adminName = user?.hoten || user?.username || "Admin";
-  const adminEmail = user?.email || "admin@example.com";
+  const AdvisorName = user?.hoten || user?.username || "Advisor";
+  const AdvisorEmail = user?.email || "Advisor@example.com";
 
   // Uncomment logout logic when ready
   const handleLogout = () => {
@@ -40,11 +38,7 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: FaChartLine },
-    { id: 'students', label: 'Students', icon: FaUsers },
-    {id: 'advisors', label: 'Advisors', icon: FaUsers},
-    {id: 'classes', label: 'Classes', icon: FaSchool},
-    {id: 'departments', label: 'Departments', icon: FaBuilding},
-    {id: 'categories', label: 'Danh mục', icon: FaListUl},
+    { id: 'classes', label: 'Lớp', icon: FaSchool },
   ];
 
   return (
@@ -52,7 +46,7 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
       {/* Minimal Top Bar */}
       <div className="bg-[#1169f9] text-white text-xs py-1.5">
         <div className="max-w-7xl mx-auto px-4 flex justify-end items-center gap-4">
-          <span>Staff Panel</span>
+          <span>Advisor Panel</span>
           <span className="text-gray-400">|</span>
           <span>Version 1.0</span>
         </div>
@@ -71,7 +65,7 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
           </button>
 
           {/* Logo and Brand */}
-          <Link to="/staff" className="flex-shrink-0">
+          <Link to="/Advisor" className="flex-shrink-0">
             <div className="flex items-center gap-3">
               <img 
                 src={logo} 
@@ -79,12 +73,12 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
                 className="h-10 w-auto object-contain"
               />
               <h1 className="text-[24px] md:text-[32px] font-black text-white tracking-tighter leading-none hover:opacity-80 transition-opacity">
-                Staff Panel STU
+                Advisor Panel STU
               </h1>
             </div>
           </Link>
 
-          {/* Right Side - Admin Profile & Notifications */}
+          {/* Right Side - Advisor Profile & Notifications */}
           <div className="flex items-center gap-3">
             {/* Notification Bell */}
             <button className="relative p-2 text-gray-300 hover:text-white transition-colors">
@@ -92,7 +86,7 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-600 rounded-full"></span>
             </button>
 
-            {/* Admin Profile */}
+            {/* Advisor Profile */}
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -102,8 +96,8 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
                   <FaUser className="text-white text-sm" />
                 </div>
                 <div className="hidden md:block text-left">
-                  <p className="text-sm font-semibold text-white">{adminName}</p>
-                  <p className="text-xs text-gray-400">Staff Member</p>
+                  <p className="text-sm font-semibold text-white">{AdvisorName}</p>
+                  <p className="text-xs text-gray-400">Advisoristrator</p>
                 </div>
               </button>
 
@@ -118,15 +112,15 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
                     <div className="py-2">
                       {/* User Info Section */}
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-semibold text-gray-900">{adminName}</p>
-                        <p className="text-xs text-gray-500">{adminEmail}</p>
-                        <p className="text-xs text-gray-400 mt-1">Role: Staff Member</p>
+                        <p className="text-sm font-semibold text-gray-900">{AdvisorName}</p>
+                        <p className="text-xs text-gray-500">{AdvisorEmail}</p>
+                        <p className="text-xs text-gray-400 mt-1">Role: Advisor</p>
                       </div>
                       
                       <button 
                         onClick={() => {
                           setIsProfileOpen(false);
-                          navigate('/staff/profile');
+                          navigate('/Advisor/profile');
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                       >
@@ -185,4 +179,4 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
   );
 };
 
-export default StaffHeader;
+export default AdvisorHeader;

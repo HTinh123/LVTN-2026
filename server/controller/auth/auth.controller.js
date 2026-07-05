@@ -5,6 +5,14 @@ const bcrypt = require('bcryptjs');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+function calculateValidUntil() {
+    const now = new Date();
+    // Add 4 years
+    now.setFullYear(now.getFullYear() + 4);
+    // Format as YYYY-MM-DD for MySQL DATE type
+    return now.toISOString().split('T')[0];
+}
+
 function generateUsername(mssv) {
     // Remove prefix letters and leading zeros
     // Example: DH52001001 -> 2001001
@@ -16,18 +24,17 @@ function generateUsername(mssv) {
 }
 
 function generatePassword(mssv) {
-    // Pattern: ABC + last 4 digits + # + first 4 characters of MSSV (letters)
-    // Example: DH52001001 -> ABC1001#DH52
+    // Pattern: ABC + last 4 digits + #
+    // Example: DH52001001 -> ABC1001#
     const digits = mssv.replace(/[^0-9]/g, '');
     const letters = mssv.replace(/[0-9]/g, '');
     
     // Get last 4 digits
     const last4Digits = digits.slice(-4);
     
-    // Get first 4 characters (letters)
-    const first4Letters = letters.slice(0, 4).toUpperCase();
     
-    return `ABC${last4Digits}#${first4Letters}`;
+    
+    return `ABC${last4Digits}#`;
 }
 
 const authController = {
@@ -76,7 +83,6 @@ const authController = {
                     hoten: user.hoten,
                     lop: user.lop,
                     role: 'student',
-                    drl_latest: user.drl_latest,
                     valid_until: user.valid_until
                 },
                 JWT_SECRET,
@@ -94,7 +100,6 @@ const authController = {
                         
                         lop: user.lop,
                         role: 'student',
-                        drl_latest: user.drl_latest,
                         valid_until: user.valid_until
                     }
                 },
@@ -625,17 +630,17 @@ resetCvhtPassword: async (req, res) => {
     }
 },
 
-// ========== REGISTER SINGLE STUDENT ==========
+//========== REGISTER SINGLE STUDENT ==========
 registerStudent: async (req, res) => {
-    const { mssv, hoten, lop, drl_latest, valid_until } = req.body;
+    const { mssv, hoten, valid_until } = req.body;
     
-    console.log('Register student called:', { mssv, hoten, lop });
+    console.log('Register student called:', { mssv, hoten });
     
     // Validate required fields
-    if (!mssv || !hoten || !lop) {
+    if (!mssv || !hoten) {
         return res.status(400).json({
             success: false,
-            error: 'Required fields: mssv, hoten, lop'
+            error: 'Required fields: mssv, hoten'
         });
     }
     
@@ -653,39 +658,23 @@ registerStudent: async (req, res) => {
             });
         }
         
-        // Check if lop exists
-        const [existingLop] = await db.query(
-            "SELECT mslop FROM lop WHERE mslop = ?",
-            [lop]
-        );
-        
-        if (existingLop.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Class (lop) not found'
-            });
-        }
-        
-        // Generate username from MSSV (remove prefix and leading zeros)
-        // Example: DH52001001 -> 2001001
+        // Generate username from MSSV
         const username = generateUsername(mssv);
         
-        // Generate password: ABC + last 4 digits + # + first 4 digits of MSSV
-        // Example: DH52001001 -> ABC1001#DH52
+        // Generate password
         const password = generatePassword(mssv);
         
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        // Set default values
-        const drl = drl_latest || 0;
-        const validUntil = valid_until || null;
+        // Use provided valid_until or calculate 4 years from now
+        const validUntil = valid_until || calculateValidUntil();
         
         // Insert student
         await db.query(
-            `INSERT INTO sinhvien (mssv, username, hoten, password, drl_latest, lop, valid_until) 
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [mssv, username, hoten, hashedPassword, drl, lop, validUntil]
+            `INSERT INTO sinhvien (mssv, username, hoten, password, valid_until) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [mssv, username, hoten, hashedPassword, validUntil]
         );
         
         // Generate JWT token
@@ -694,7 +683,6 @@ registerStudent: async (req, res) => {
                 id: mssv,
                 username: username,
                 hoten: hoten,
-                lop: lop,
                 role: 'student'
             },
             JWT_SECRET,
@@ -709,8 +697,6 @@ registerStudent: async (req, res) => {
                     mssv: mssv,
                     username: username,
                     hoten: hoten,
-                    lop: lop,
-                    drl_latest: drl,
                     valid_until: validUntil,
                     role: 'student'
                 }
@@ -744,16 +730,14 @@ bulkRegisterFromFile: async (req, res) => {
             const lines = fileContent.split('\n').filter(line => line.trim());
             const headers = lines[0].split(',').map(h => h.trim());
             
-            // Expected headers: mssv,hoten,lop,drl_latest,valid_until
+            // Expected headers: mssv,hoten,lop,valid_until
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
                 if (values.length >= 3) {
                     students.push({
                         mssv: values[0],
-                        hoten: values[1],
-                        lop: values[2],
-                        drl_latest: values[3] ? parseInt(values[3]) : 0,
-                        valid_until: values[4] || null
+                        hoten: values[1],                     
+                        valid_until: values[2] || null // Will be handled later
                     });
                 }
             }
@@ -772,9 +756,7 @@ bulkRegisterFromFile: async (req, res) => {
                     students.push({
                         mssv: values[0],
                         hoten: values[1],
-                        lop: values[2],
-                        drl_latest: values[3] ? parseInt(values[3]) : 0,
-                        valid_until: values[4] || null
+                        valid_until: values[2] || null // Will be handled later
                     });
                 }
             }
@@ -805,11 +787,11 @@ bulkRegisterFromFile: async (req, res) => {
             await connection.beginTransaction();
             
             for (const student of students) {
-                const { mssv, hoten, lop, drl_latest, valid_until } = student;
+                const { mssv, hoten, valid_until } = student;
                 
                 try {
                     // Validate
-                    if (!mssv || !hoten || !lop) {
+                    if (!mssv || !hoten) {
                         results.failed++;
                         results.errors.push({ mssv: mssv || 'unknown', error: 'Missing required fields' });
                         continue;
@@ -832,11 +814,14 @@ bulkRegisterFromFile: async (req, res) => {
                     const password = generatePassword(mssv);
                     const hashedPassword = await bcrypt.hash(password, 10);
                     
+                    // Use provided valid_until or calculate 4 years from now
+                    const validUntil = valid_until || calculateValidUntil();
+                    
                     // Insert
                     await connection.query(
-                        `INSERT INTO sinhvien (mssv, username, hoten, password, drl_latest, lop, valid_until) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                        [mssv, username, hoten, hashedPassword, drl_latest || 0, lop, valid_until || null]
+                        `INSERT INTO sinhvien (mssv, username, hoten, password, valid_until) 
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [mssv, username, hoten, hashedPassword, validUntil]
                     );
                     
                     results.success++;
@@ -866,7 +851,49 @@ bulkRegisterFromFile: async (req, res) => {
             error: err.message 
         });
     }
-}
+},
+
+// ========== RESET STUDENT PASSWORD ==========
+resetStudentPassword: async (req, res) => {
+    const { mssv } = req.params;
+    
+    
+    try {
+        // Check if student exists
+        const [student] = await db.query(
+            "SELECT * FROM sinhvien WHERE mssv = ?",
+            [mssv]
+        );
+        
+        if (student.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Student not found'
+            });
+        }
+        const newPassword = generatePassword(mssv);
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        // Reset password
+        await db.query(
+            "UPDATE sinhvien SET password = ? WHERE mssv = ?",
+            [hashedPassword, mssv]
+        );
+        
+        res.json({
+            success: true,
+            message: 'Student password reset successfully',
+            data: { newPassword }
+        });
+    } catch (err) {
+        console.error('Error in resetStudentPassword:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
 
 };
 

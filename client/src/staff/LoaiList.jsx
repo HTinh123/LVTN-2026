@@ -1,35 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import PageWrapper from '../components/PageWrapper';
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL =  'http://localhost:5000';
 
-function StaffList() {
-  const [staff, setStaff] = useState([]);
-  const [stats, setStats] = useState({
-    totalStaff: 0,
-  });
+function LoaiList() {
+  const navigate = useNavigate();
+  const { ms_danhmuc } = useParams();
+  const [loais, setLoais] = useState([]);
+  const [danhmucInfo, setDanhmucInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState(''); // 'add', 'password', 'delete'
-  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [modalMode, setModalMode] = useState(''); // 'add', 'edit', 'delete'
+  const [selectedLoai, setSelectedLoai] = useState(null);
   
-  // Form data for adding staff
+  // Form data
   const [formData, setFormData] = useState({
-    msnv: '',
-    hoten: '',
-    username: '',
-    password: ''
-  });
-  
-  // Password reset form
-  const [passwordData, setPasswordData] = useState({
-    newPassword: ''
+    ten_loai: ''
   });
   
   const [warningMessage, setWarningMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   // Helper function to get auth headers
   const getAuthHeaders = () => {
@@ -40,75 +34,72 @@ function StaffList() {
     };
   };
 
-  // Fetch staff on component mount
+  // Fetch loais on component mount
   useEffect(() => {
-    fetchStaff();
-  }, []);
+    if (ms_danhmuc) {
+      fetchLoais();
+    }
+  }, [ms_danhmuc]);
 
-  // Recalculate stats whenever staff changes
-  useEffect(() => {
-    calculateStats(staff);
-  }, [staff]);
-
-  const fetchStaff = async () => {
+  // Fetch loais by danhmuc
+  const fetchLoais = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${BASE_URL}/api/admin/staff`, {
+      const res = await fetch(`${BASE_URL}/api/staff/danhmuc/${ms_danhmuc}/loai`, {
         headers: getAuthHeaders()
       });
       const data = await res.json();
       if (data.success) {
-        setStaff(data.data || []);
+        setLoais(data.data?.loai_list || []);
+        setDanhmucInfo(data.data?.danhmuc || null);
       } else {
-        setError(data.error || 'Failed to fetch staff');
+        setError(data.error || 'Failed to fetch loais');
       }
     } catch (err) {
-      setError('Failed to fetch staff. Please check your connection.');
-      console.error('Fetch staff error:', err);
+      setError('Failed to fetch loais. Please check your connection.');
+      console.error('Fetch loais error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateStats = (staffData) => {
-    const totalStaff = staffData.length;
-    setStats({
-      totalStaff: totalStaff,
-    });
-  };
-
-  // Handle adding new staff
-  const handleAddStaff = () => {
+  // Handle add new loai
+  const handleAdd = () => {
     setModalMode('add');
-    setFormData({
-      msnv: '',
-      hoten: '',
-      username: '',
-      password: ''
-    });
-    setWarningMessage('You are about to create a new staff account. Please fill in all required fields.');
+    setFormData({ ten_loai: '' });
+    setWarningMessage('You are about to create a new loai. Please fill in all required fields.');
     setShowModal(true);
   };
 
-  // Handle reset password
-  const handleResetPassword = (staff) => {
-    setModalMode('password');
-    setSelectedStaff(staff);
-    setPasswordData({ newPassword: '' });
-    setWarningMessage(`You are about to reset the password for staff "${staff.hoten}" (${staff.username}). This action cannot be undone.`);
+  // Handle edit loai
+  const handleEdit = (item) => {
+    setModalMode('edit');
+    setSelectedLoai(item);
+    setFormData({ ten_loai: item.ten_loai });
+    setWarningMessage(`You are about to edit loai "${item.ten_loai}".`);
     setShowModal(true);
   };
 
-  // Handle delete staff
-  const handleDeleteStaff = (staff) => {
+  // Handle delete loai
+  const handleDelete = (item) => {
     setModalMode('delete');
-    setSelectedStaff(staff);
-    setWarningMessage(`Are you sure you want to delete staff "${staff.hoten}" (${staff.username})? This action cannot be undone.`);
+    setSelectedLoai(item);
+    setWarningMessage(`Are you sure you want to delete loai "${item.ten_loai}"? This will also delete all associated tieuchi.`);
     setShowModal(true);
   };
 
-  // Submit handler for all actions
+  // Handle click on loai row - navigate to TieuchiList
+  const handleRowClick = (item) => {
+    navigate(`/staff/danhmuc/${ms_danhmuc}/loai/${item.ms_loai}/tieuchi`);
+  };
+
+  // Handle back to danhmuc list
+  const handleBack = () => {
+    navigate('/staff/danhmuc');
+  };
+
+  // Submit handler
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
@@ -121,19 +112,22 @@ function StaffList() {
 
       switch (modalMode) {
         case 'add':
-          url = `${BASE_URL}/api/auth/staff/register`;
+          url = `${BASE_URL}/api/staff/loai`;
           method = 'POST';
-          body = formData;
+          body = { 
+            ten_loai: formData.ten_loai,
+            ms_danhmuc: parseInt(ms_danhmuc)
+          };
           break;
           
-        case 'password':
-          url = `${BASE_URL}/api/auth/staff/${selectedStaff.msnv}/reset-password`;
-          method = 'POST';
-          body = { newPassword: passwordData.newPassword };
+        case 'edit':
+          url = `${BASE_URL}/api/staff/loai/${selectedLoai.ms_loai}`;
+          method = 'PUT';
+          body = { ten_loai: formData.ten_loai };
           break;
           
         case 'delete':
-          url = `${BASE_URL}/api/admin/staff/${selectedStaff.msnv}`;
+          url = `${BASE_URL}/api/staff/loai/${selectedLoai.ms_loai}`;
           method = 'DELETE';
           body = {};
           break;
@@ -152,10 +146,9 @@ function StaffList() {
       
       if (data.success) {
         setSuccessMessage(data.message || 'Operation completed successfully');
-        fetchStaff(); // Refresh the list
+        fetchLoais();
         setShowModal(false);
         
-        // Clear success message after 3 seconds
         setTimeout(() => {
           setSuccessMessage('');
         }, 3000);
@@ -170,31 +163,18 @@ function StaffList() {
     }
   };
 
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  if (loading && staff.length === 0) {
+  if (loading && loais.length === 0) {
     return (
-      
+      <PageWrapper>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
-      
+      </PageWrapper>
     );
   }
 
   return (
-    
+    <PageWrapper>
       <div className="space-y-6">
         {/* Success message */}
         {successMessage && (
@@ -234,18 +214,34 @@ function StaffList() {
           </div>
         )}
 
+        {/* Header with Back Button */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBack}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back
+          </button>
+          <h2 className="text-2xl font-semibold text-gray-800">
+            {danhmucInfo?.ten_danhmuc || 'Loai Management'}
+          </h2>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <dt className="text-sm font-medium text-gray-500 truncate">Total Staff</dt>
-              <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.totalStaff}</dd>
+              <dt className="text-sm font-medium text-gray-500 truncate">Total Loai</dt>
+              <dd className="mt-1 text-3xl font-semibold text-gray-900">{loais.length}</dd>
             </div>
           </div>
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <dt className="text-sm font-medium text-gray-500 truncate">Active Staff</dt>
-              <dd className="mt-1 text-3xl font-semibold text-green-600">{stats.totalStaff}</dd>
+              <dt className="text-sm font-medium text-gray-500 truncate">Danhmuc</dt>
+              <dd className="mt-1 text-lg font-semibold text-blue-600">{danhmucInfo?.ten_danhmuc || 'N/A'}</dd>
             </div>
           </div>
           <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -253,25 +249,25 @@ function StaffList() {
               <dt className="text-sm font-medium text-gray-500 truncate">Actions</dt>
               <dd className="mt-1">
                 <button
-                  onClick={handleAddStaff}
+                  onClick={handleAdd}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                   </svg>
-                  Add Staff
+                  Add Loai
                 </button>
               </dd>
             </div>
           </div>
         </div>
 
-        {/* Staff Table */}
+        {/* Loai Table */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Staff Management</h3>
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Loai Management</h3>
             <button
-              onClick={fetchStaff}
+              onClick={fetchLoais}
               className="text-sm text-blue-600 hover:text-blue-800"
             >
               <svg className="inline-block h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -284,51 +280,51 @@ function StaffList() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Loai</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm Tổng</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {staff.length === 0 ? (
+                {loais.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
-                      No staff members found. Click "Add Staff" to create one.
+                    <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                      No loai found. Click "Add Loai" to create one.
                     </td>
                   </tr>
                 ) : (
-                  staff.map((member) => (
-                    <tr key={member.msnv} className="hover:bg-gray-50 transition-colors">
+                  loais.map((item) => (
+                    <tr 
+                      key={item.ms_loai} 
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => handleRowClick(item)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {member.msnv}
+                        {item.ms_loai}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {member.hoten}
+                        {item.ten_loai}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {member.username}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {member.role === 0 ? 'Staff' : 'Admin'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(member.created_at)}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.diem_tong || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
-                          onClick={() => handleResetPassword(member)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(item);
+                          }}
                           className="text-blue-600 hover:text-blue-900 transition-colors"
                         >
-                          Reset Password
+                          Edit
                         </button>
                         <span className="text-gray-300">|</span>
                         <button
-                          onClick={() => handleDeleteStaff(member)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(item);
+                          }}
                           className="text-red-600 hover:text-red-900 transition-colors"
                         >
                           Delete
@@ -356,17 +352,11 @@ function StaffList() {
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="sm:flex sm:items-start">
                     <div className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${
-                      modalMode === 'add' ? 'bg-blue-100' : 
-                      modalMode === 'password' ? 'bg-yellow-100' : 'bg-red-100'
+                      modalMode === 'add' || modalMode === 'edit' ? 'bg-blue-100' : 'bg-red-100'
                     } sm:mx-0 sm:h-10 sm:w-10`}>
-                      {modalMode === 'add' && (
+                      {(modalMode === 'add' || modalMode === 'edit') && (
                         <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                      )}
-                      {modalMode === 'password' && (
-                        <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       )}
                       {modalMode === 'delete' && (
@@ -377,75 +367,26 @@ function StaffList() {
                     </div>
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                       <h3 className="text-lg leading-6 font-medium text-gray-900">
-                        {modalMode === 'add' && 'Add New Staff'}
-                        {modalMode === 'password' && 'Reset Password'}
-                        {modalMode === 'delete' && 'Delete Staff'}
+                        {modalMode === 'add' && 'Add New Loai'}
+                        {modalMode === 'edit' && 'Edit Loai'}
+                        {modalMode === 'delete' && 'Delete Loai'}
                       </h3>
                       <div className="mt-2">
                         <p className="text-sm text-gray-500">{warningMessage}</p>
                         
-                        {/* Add Staff Form */}
-                        {modalMode === 'add' && (
-                          <div className="mt-4 space-y-3">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Staff ID (MSNV) *</label>
-                              <input
-                                type="text"
-                                required
-                                value={formData.msnv}
-                                onChange={(e) => setFormData({ ...formData, msnv: e.target.value })}
-                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="e.g., NV001"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                              <input
-                                type="text"
-                                required
-                                value={formData.hoten}
-                                onChange={(e) => setFormData({ ...formData, hoten: e.target.value })}
-                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="Enter full name"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Username *</label>
-                              <input
-                                type="text"
-                                required
-                                value={formData.username}
-                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="Enter username"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Password *</label>
-                              <input
-                                type="password"
-                                required
-                                value={formData.password}
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="Enter password (min 6 characters)"
-                              />
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Reset Password Form */}
-                        {modalMode === 'password' && (
+                        {(modalMode === 'add' || modalMode === 'edit') && (
                           <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">New Password *</label>
-                            <input
-                              type="password"
-                              required
-                              value={passwordData.newPassword}
-                              onChange={(e) => setPasswordData({ newPassword: e.target.value })}
-                              className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                              placeholder="Enter new password (min 6 characters)"
-                            />
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Tên Loai *</label>
+                              <input
+                                type="text"
+                                required
+                                value={formData.ten_loai}
+                                onChange={(e) => setFormData({ ...formData, ten_loai: e.target.value })}
+                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="Enter loai name"
+                              />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -456,14 +397,11 @@ function StaffList() {
                   <button
                     onClick={handleSubmit}
                     disabled={
-                      (modalMode === 'add' && (!formData.msnv || !formData.hoten || !formData.username || !formData.password || formData.password.length < 6)) ||
-                      (modalMode === 'password' && (!passwordData.newPassword || passwordData.newPassword.length < 6)) ||
+                      ((modalMode === 'add' || modalMode === 'edit') && !formData.ten_loai) ||
                       loading
                     }
                     className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${
-                      modalMode === 'add' ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' :
-                      modalMode === 'password' ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' :
-                      'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                      (modalMode === 'add' || modalMode === 'edit') ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {loading ? (
@@ -490,8 +428,8 @@ function StaffList() {
           </div>
         )}
       </div>
-    
+    </PageWrapper>
   );
 }
 
-export default StaffList;
+export default LoaiList;

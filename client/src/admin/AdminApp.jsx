@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
 import AdminHeader from '../layout/AdminHeader';
-import PageWrapper from '../components/PageWrapper';
 import StaffList from './StaffList'; 
 
 
@@ -58,7 +57,7 @@ function AdminApp() {
       />
 
       <div className="py-6 sm:px-6 lg:px-8">
-        <PageWrapper>
+        
           <Routes>
             {/* Dashboard Route */}
             <Route path="/" element={
@@ -66,9 +65,7 @@ function AdminApp() {
                 <h2 className="text-2xl font-semibold text-gray-700 mb-4">
                   Welcome, {user.hoten || user.username || 'Admin'}!
                 </h2>
-                <p className="text-gray-600 mb-6">
-                  This is your admin dashboard. Use the navigation menu to manage the system.
-                </p>
+                
                 
               
               </div>
@@ -103,7 +100,7 @@ function AdminApp() {
               </div>
             } />
           </Routes>
-        </PageWrapper>
+        
       </div>
     </div>
   );
