@@ -11,7 +11,7 @@ import {
   FaChevronDown,
   FaNewspaper,
 } from "react-icons/fa";
-import logo from "../assets/logo.png";
+import logo from "../assets/Logo.png";
 import { toast } from 'react-toastify';
 
 const StudentHeader = ({ activeTab, onTabChange, user }) => {
