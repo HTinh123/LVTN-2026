@@ -7,6 +7,9 @@ import AdminApp from './admin/AdminApp';
 import StudentApp from './student/StudentApp';
 import StaffApp from './staff/StaffApp';
 import AdvisorApp from './advisor/AdvisorApp';
+import DiemRenLuyen from './student/DiemRenLuyen';
+import StaffDrlView from './staff/StaffDrlView';
+import ProfileWrapper from './layout/ProfileWrapper';
 
 function App() {
   return (
@@ -28,6 +31,32 @@ function App() {
           } 
         />
         
+        <Route 
+          path="/staff/drl/:mssv?" 
+         element={
+    <ProtectedRoute requiredRole="staff">
+      <StaffDrlView />
+    </ProtectedRoute>
+          } 
+        />
+
+ <Route 
+  path="/profile" 
+  element={
+    <ProtectedRoute requiredRole={['student', 'staff', 'admin', 'cvht']}>
+      <ProfileWrapper />
+    </ProtectedRoute>
+  } 
+/>
+
+        <Route 
+          path="/student/drl/:mssv?" 
+          element={
+            <ProtectedRoute requiredRole="student">
+              <DiemRenLuyen />
+            </ProtectedRoute>
+          } 
+        />
     
          <Route 
           path="/cvht/*" 

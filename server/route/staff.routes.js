@@ -1,6 +1,8 @@
 const express = require('express');
 const staffController = require('../controller/staff/staff.controller');
+const qrController = require('../controller/staff/qr.controller');
 const { verifyToken, isStaff } = require('../middleware/verifyToken');
+const upload = require('../config/upload')
 
 const router = express.Router();
 
@@ -23,6 +25,7 @@ router.get('/classes', staffController.getAllClasses);
 // ========== SEMESTER ROUTES ==========
 router.get('/semesters', staffController.getAllSemesters);
 router.get('/semesters/current', staffController.getCurrentSemester);
+router.get('/semesters/now', staffController.getSemesterNow);
 router.get('/semesters/:ms_hocky', staffController.getSemester);
 
 
@@ -49,6 +52,8 @@ router.get('/students/semesters/:ms_hocky', staffController.getStudentsBySemeste
 // Get students by department and semester
 router.get('/departments/:ms_khoa/semesters/:ms_hocky/students', staffController.getStudentsByDepartmentAndSemester);
 
+router.get('/students/:mssv/current-class', staffController.getCurrentLopForStudent);
+router.get('/students/:mssv/is-enrolled', staffController.isStudentEnrolledNow);
 // ========== DANHMUC CRUD ROUTES ==========
 router.get('/danhmuc', staffController.getAllDanhmuc);
 router.get('/danhmuc/:ms_danhmuc', staffController.getDanhmucById);
@@ -106,5 +111,49 @@ router.put('/khoa/:ms_khoa', staffController.updateKhoa);
 
 // Delete department
 router.delete('/khoa/:ms_khoa', staffController.deleteKhoa);
+
+// ========== ACTIVITY (HOAT DONG) ROUTES ==========
+
+// Get all activities
+router.get('/hoat-dong', staffController.getAllHoatDong);
+
+// Get activity by ID
+router.get('/hoat-dong/:mshd', staffController.getHoatDongById);
+
+// Get activities by staff
+//router.get('/hoat-dong/staff/:msnv', staffController.getHoatDongByStaff);
+
+// Get activities by department
+router.get('/hoat-dong/khoa/:mskhoa', staffController.getHoatDongByKhoa);
+
+// Get activity count by staff
+router.get('/hoat-dong/staff/:msnv/count', staffController.getHoatDongCountByStaff);
+
+// Get activity count by department
+router.get('/hoat-dong/khoa/:mskhoa/count', staffController.getHoatDongCountByKhoa);
+
+router.post('/hoat-dong', upload.single('img'), staffController.createHoatDong);
+router.put('/hoat-dong/:mshd', upload.single('img'), staffController.updateHoatDong);
+
+// Delete activity
+router.delete('/hoat-dong/:mshd', staffController.deleteHoatDong);
+
+// ========== QR CODE ROUTES ==========
+// Get active activities for QR generation dropdown
+router.get('/qr/active-activities', qrController.getActiveActivities);
+
+// Generate QR code
+router.post('/qr/generate', qrController.generateQR);
+
+// Get QR codes by activity
+router.get('/qr/activity/:mshd', qrController.getQRCodesByActivity);
+
+// Get my generated QR codes
+router.get('/qr/my-codes', qrController.getMyQRCodes);
+
+// Revoke QR code
+router.put('/qr/:ms_qr/revoke', qrController.revokeQR);
+
+
 
 module.exports = router;

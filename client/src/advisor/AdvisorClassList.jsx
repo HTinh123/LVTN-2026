@@ -115,7 +115,7 @@ function AdvisorClassList() {
 
   // Handle click on class row - navigate to ClassStudentList
   const handleClassClick = (classItem) => {
-    navigate(`/advisor/classes/${classItem.mslop}/students`, {
+    navigate(`/cvht/classes/${classItem.mslop}/students`, {
       state: { 
         classInfo: classItem,
         semester: semesters.find(s => s.ms_hocky == selectedSemester),
@@ -141,6 +141,24 @@ function AdvisorClassList() {
     return sem?.display_name || sem?.hocky || 'N/A';
   };
 
+  // Helper function to format semester display name
+const getSemesterDisplayName = (sem) => {
+  if (!sem) return 'N/A';
+  if (sem.display_name) return sem.display_name;
+  
+  const year = sem.nam;
+  let startYear = year;
+  let endYear = year + 1;
+  
+  // For semester 2, academic year is (year-1) - year
+  if (sem.hocky === '2') {
+    startYear = year - 1;
+    endYear = year;
+  }
+  
+  return `HK${sem.hocky} (${startYear} - ${endYear})`;
+};
+
   if (loading && classes.length === 0) {
     return (
       <PageWrapper>
@@ -154,28 +172,7 @@ function AdvisorClassList() {
   return (
     <PageWrapper>
       <div className="space-y-6">
-        {/* Success/Info message */}
-        {advisorInfo && (
-          <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-blue-700">
-                  <strong>Advisor:</strong> {advisorInfo.hoten} ({advisorInfo.username})
-                  {currentSemester && (
-                    <span className="ml-4">
-                      <strong>Current Semester:</strong> {currentSemester.display_name || `HK${currentSemester.hocky} - ${currentSemester.nam}`}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        
 
         {/* Error message */}
         {error && (
@@ -207,7 +204,7 @@ function AdvisorClassList() {
             <div className="px-4 py-5 sm:p-6">
               <dt className="text-sm font-medium text-gray-500 truncate">Semester</dt>
               <dd className="mt-1 text-lg font-semibold text-gray-900">
-                {selectedSemester ? getSemesterDisplay(selectedSemester) : 'N/A'}
+                {selectedSemester ? getSemesterDisplayName(semesters.find(s => s.ms_hocky === selectedSemester)) : 'N/A'}
               </dd>
             </div>
           </div>
@@ -219,16 +216,27 @@ function AdvisorClassList() {
             <div className="w-full sm:w-64">
               <label className="block text-sm font-medium text-gray-700">Semester</label>
               <select
-                value={selectedSemester}
-                onChange={handleSemesterChange}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              >
-                {semesters.map((sem) => (
-                  <option key={sem.ms_hocky} value={sem.ms_hocky}>
-                    {sem.display_name || `HK${sem.hocky} - ${sem.nam}`}
-                  </option>
-                ))}
-              </select>
+  value={selectedSemester}
+  onChange={handleSemesterChange}
+  className="mt-1 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent "
+>
+  {semesters.length > 0 ? (
+    semesters.map((sem) => {
+      // Format: HK2 (2025 - 2026)
+      const year = sem.nam;
+      const nextYear = year + 1;
+      const displayName =  `HK${sem.hocky} (${year} - ${nextYear})`;
+      
+      return (
+        <option key={sem.ms_hocky} value={sem.ms_hocky}>
+          {displayName}
+        </option>
+      );
+    })
+  ) : (
+    <option value="">No semesters available</option>
+  )}
+</select>
             </div>
             <button
               onClick={fetchClasses}

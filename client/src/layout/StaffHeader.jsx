@@ -11,6 +11,7 @@ import {
   FaSchool,
   FaBuilding,
   FaListUl,
+  
 } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import { toast } from 'react-toastify';
@@ -45,6 +46,7 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
     {id: 'classes', label: 'Classes', icon: FaSchool},
     {id: 'departments', label: 'Departments', icon: FaBuilding},
     {id: 'categories', label: 'Danh mục', icon: FaListUl},
+    {id: 'activities', label: 'Hoạt động', icon: FaListUl},
   ];
 
   return (
@@ -126,7 +128,7 @@ const StaffHeader = ({ activeTab, onTabChange, user }) => {
                       <button 
                         onClick={() => {
                           setIsProfileOpen(false);
-                          navigate('/staff/profile');
+                          navigate('/profile');
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                       >

@@ -8,5 +8,9 @@ router.get('/staff',  adminController.getAllStaff);
 router.get('/staff/:msnv',  adminController.getStaffById);
 router.delete('/staff/:msnv',  adminController.deleteStaff);
 
+router.get('/admin',  adminController.getAllAdmins);
+router.get('/admin/:msnv',  adminController.getAdminById);
+
+
 
 module.exports = router;

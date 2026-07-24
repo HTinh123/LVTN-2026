@@ -1,4 +1,6 @@
 const db = require('../../db');
+const path = require('path');
+const fs = require('fs');
 
 const staffController = {
     // ========== GET ALL CVHT ==========
@@ -1026,11 +1028,13 @@ getLoaiByDanhmuc: async (req, res) => {
 
 // ========== TIEUCHI (Criteria) CRUD ==========
 
+// ========== TIEUCHI (Criteria) CRUD ==========
+
 // GET all tieuchi
 getAllTieuchi: async (req, res) => {
     try {
         const [results] = await db.query(
-            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.ms_loai,
+            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.type, t.ms_loai,
                     l.ten_loai, l.diem_tong,
                     d.ms_danhmuc, d.ten_danhmuc
              FROM tieuchi t
@@ -1059,7 +1063,7 @@ getTieuchiById: async (req, res) => {
     
     try {
         const [results] = await db.query(
-            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.ms_loai,
+            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.type, t.ms_loai,
                     l.ten_loai, l.diem_tong,
                     d.ms_danhmuc, d.ten_danhmuc
              FROM tieuchi t
@@ -1112,7 +1116,7 @@ getTieuchiByLoai: async (req, res) => {
         }
         
         const [results] = await db.query(
-            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.ms_loai
+            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.type, t.ms_loai
              FROM tieuchi t
              WHERE t.ms_loai = ?
              ORDER BY t.ten_tieuchi ASC`,
@@ -1164,7 +1168,8 @@ getTieuchiByDanhmuc: async (req, res) => {
                     JSON_OBJECT(
                         'mstc', t.mstc,
                         'ten_tieuchi', t.ten_tieuchi,
-                        'diem', t.diem
+                        'diem', t.diem,
+                        'type', t.type
                     )
                 ) AS tieuchi_list
              FROM loai l
@@ -1232,7 +1237,7 @@ getFullHierarchy: async (req, res) => {
         const [danhmucs] = await db.query(
             `SELECT ms_danhmuc, ten_danhmuc, diem_danhmuc 
              FROM danhmuc 
-             ORDER BY ms_danhmuc ASC`  // ← Sort by ID to maintain order
+             ORDER BY ms_danhmuc ASC`
         );
         
         const result = [];
@@ -1247,14 +1252,15 @@ getFullHierarchy: async (req, res) => {
                         JSON_OBJECT(
                             'mstc', t.mstc,
                             'ten_tieuchi', t.ten_tieuchi,
-                            'diem', t.diem
+                            'diem', t.diem,
+                            'type', t.type
                         )
                     ) AS tieuchi_list
                  FROM loai l
                  LEFT JOIN tieuchi t ON l.ms_loai = t.ms_loai
                  WHERE l.ms_danhmuc = ?
                  GROUP BY l.ms_loai, l.ten_loai, l.diem_tong
-                 ORDER BY l.ms_loai ASC`,  // ← Sort by ID to maintain order
+                 ORDER BY l.ms_loai ASC`,
                 [danhmuc.ms_danhmuc]
             );
             
@@ -1274,7 +1280,7 @@ getFullHierarchy: async (req, res) => {
                 }
             });
             
-            // Sort tieuchi within each loai by ms_loai
+            // Sort tieuchi within each loai by mstc
             formattedLoais.forEach(loai => {
                 if (loai.tieuchi_list && Array.isArray(loai.tieuchi_list)) {
                     loai.tieuchi_list.sort((a, b) => a.mstc - b.mstc);
@@ -2258,7 +2264,7 @@ deleteLoai: async (req, res) => {
 
 // CREATE Tieuchi
 createTieuchi: async (req, res) => {
-    const { ten_tieuchi, diem, ms_loai } = req.body;
+    const { ten_tieuchi, diem, type, ms_loai } = req.body;
     
     if (!ten_tieuchi || !ms_loai) {
         return res.status(400).json({
@@ -2282,22 +2288,23 @@ createTieuchi: async (req, res) => {
         }
         
         const diemValue = diem || 0;
+        const typeValue = type !== undefined ? type : 0;
         
         // Insert new tieuchi
         const [result] = await db.query(
-            "INSERT INTO tieuchi (ten_tieuchi, diem, ms_loai) VALUES (?, ?, ?)",
-            [ten_tieuchi, diemValue, ms_loai]
+            "INSERT INTO tieuchi (ten_tieuchi, diem, type, ms_loai) VALUES (?, ?, ?, ?)",
+            [ten_tieuchi, diemValue, typeValue, ms_loai]
         );
         
         // Recalculate loai diem_tong
-        await staffController.recalculateLoaiDiem(ms_loai);
+        await this.recalculateLoaiDiem(ms_loai);
         
         // Recalculate danhmuc diem_danhmuc
-        await staffController.recalculateDanhmucDiem(loai[0].ms_danhmuc);
+        await this.recalculateDanhmucDiem(loai[0].ms_danhmuc);
         
         // Get the created tieuchi
         const [newTieuchi] = await db.query(
-            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.ms_loai,
+            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.type, t.ms_loai,
                     l.ten_loai, l.diem_tong,
                     d.ms_danhmuc, d.ten_danhmuc
              FROM tieuchi t
@@ -2324,7 +2331,7 @@ createTieuchi: async (req, res) => {
 // UPDATE Tieuchi
 updateTieuchi: async (req, res) => {
     const { mstc } = req.params;
-    const { ten_tieuchi, diem, ms_loai } = req.body;
+    const { ten_tieuchi, diem, type, ms_loai } = req.body;
     
     if (!ten_tieuchi) {
         return res.status(400).json({
@@ -2367,17 +2374,18 @@ updateTieuchi: async (req, res) => {
         }
         
         const diemValue = diem !== undefined ? diem : existing[0].diem;
+        const typeValue = type !== undefined ? type : existing[0].type;
         
         // Update tieuchi
         await db.query(
-            "UPDATE tieuchi SET ten_tieuchi = ?, diem = ?, ms_loai = ? WHERE mstc = ?",
-            [ten_tieuchi, diemValue, newLoai, mstc]
+            "UPDATE tieuchi SET ten_tieuchi = ?, diem = ?, type = ?, ms_loai = ? WHERE mstc = ?",
+            [ten_tieuchi, diemValue, typeValue, newLoai, mstc]
         );
         
         // Recalculate both old and new loai
-        await staffController.recalculateLoaiDiem(oldLoai);
+        await this.recalculateLoaiDiem(oldLoai);
         if (oldLoai !== newLoai) {
-            await staffController.recalculateLoaiDiem(newLoai);
+            await this.recalculateLoaiDiem(newLoai);
         }
         
         // Recalculate danhmuc for both loai
@@ -2386,7 +2394,7 @@ updateTieuchi: async (req, res) => {
             [oldLoai]
         );
         if (oldLoaiData.length > 0) {
-            await staffController.recalculateDanhmucDiem(oldLoaiData[0].ms_danhmuc);
+            await this.recalculateDanhmucDiem(oldLoaiData[0].ms_danhmuc);
         }
         
         if (ms_loai) {
@@ -2395,13 +2403,13 @@ updateTieuchi: async (req, res) => {
                 [newLoai]
             );
             if (newLoaiData.length > 0) {
-                await staffController.recalculateDanhmucDiem(newLoaiData[0].ms_danhmuc);
+                await this.recalculateDanhmucDiem(newLoaiData[0].ms_danhmuc);
             }
         }
         
         // Get updated tieuchi
         const [updated] = await db.query(
-            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.ms_loai,
+            `SELECT t.mstc, t.ten_tieuchi, t.diem, t.type, t.ms_loai,
                     l.ten_loai, l.diem_tong,
                     d.ms_danhmuc, d.ten_danhmuc
              FROM tieuchi t
@@ -2473,6 +2481,886 @@ deleteTieuchi: async (req, res) => {
     }
 },
 
+// ========== GET CURRENT SEMESTER BASED ON DATE ==========
+getSemesterNow: async (req, res) => {
+    try {
+        const now = new Date();
+        const today = now.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+        
+        // Find the semester that contains today's date
+        const [semester] = await db.query(
+            `SELECT ms_hocky, hocky, nam, ngay_batdau, ngay_ketthuc,
+                    CONCAT('HK', hocky, ' - ', nam) AS display_name
+             FROM hocky 
+             WHERE ? BETWEEN ngay_batdau AND ngay_ketthuc`,
+            [today]
+        );
+        
+        if (semester.length === 0) {
+            // If no current semester found, get the most recent semester
+            const [latestSemester] = await db.query(
+                `SELECT ms_hocky, hocky, nam, ngay_batdau, ngay_ketthuc,
+                        CONCAT('HK', hocky, ' - ', nam) AS display_name
+                 FROM hocky 
+                 ORDER BY nam DESC, hocky DESC 
+                 LIMIT 1`
+            );
+            
+            if (latestSemester.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'No semester found in the system'
+                });
+            }
+            
+            return res.json({
+                success: true,
+                data: {
+                    ...latestSemester[0],
+                    is_current: false,
+                    message: 'No active semester found. Returning the latest semester.'
+                }
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                ...semester[0],
+                is_current: true
+            }
+        });
+    } catch (err) {
+        console.error('Error in getSemesterNow:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// ========== GET CURRENT CLASS FOR A STUDENT ==========
+getCurrentLopForStudent: async (req, res) => {
+    const { mssv } = req.params;
+    
+    try {
+        // 1. Check if student exists
+        const [student] = await db.query(
+            "SELECT mssv, hoten FROM sinhvien WHERE mssv = ?",
+            [mssv]
+        );
+        
+        if (student.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Student not found'
+            });
+        }
+        
+        // 2. Get current semester
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        
+        const [currentSemester] = await db.query(
+            `SELECT ms_hocky, hocky, nam, ngay_batdau, ngay_ketthuc,
+                    CONCAT('HK', hocky, ' - ', nam) AS display_name
+             FROM hocky 
+             WHERE ? BETWEEN ngay_batdau AND ngay_ketthuc`,
+            [today]
+        );
+        
+        let semesterId;
+        let semesterInfo;
+        
+        if (currentSemester.length > 0) {
+            // Use current semester
+            semesterId = currentSemester[0].ms_hocky;
+            semesterInfo = {
+                ...currentSemester[0],
+                is_current: true
+            };
+        } else {
+            // If no current semester, get the student's most recent semester
+            const [latestStudentSemester] = await db.query(
+                `SELECT sl.ms_hocky, h.hocky, h.nam, h.ngay_batdau, h.ngay_ketthuc,
+                        CONCAT('HK', h.hocky, ' - ', h.nam) AS display_name
+                 FROM sinhvien_lop sl
+                 INNER JOIN hocky h ON sl.ms_hocky = h.ms_hocky
+                 WHERE sl.mssv = ?
+                 ORDER BY h.nam DESC, h.hocky DESC
+                 LIMIT 1`,
+                [mssv]
+            );
+            
+            if (latestStudentSemester.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Student has no class assignments'
+                });
+            }
+            
+            semesterId = latestStudentSemester[0].ms_hocky;
+            semesterInfo = {
+                ...latestStudentSemester[0],
+                is_current: false,
+                message: 'No active semester. Showing the student\'s latest semester.'
+            };
+        }
+        
+        // 3. Get the student's class for the determined semester
+        const [classInfo] = await db.query(
+            `SELECT 
+                sl.ms_svl,
+                sl.mssv,
+                sl.mslop,
+                sl.ms_hocky,
+                sl.created_at AS assigned_date,
+                l.ms_khoa,
+                k.ten_khoa AS department_name,
+                CONCAT('HK', h.hocky, ' - ', h.nam) AS semester_name,
+                cl.ms_cvht AS cvht_id,
+                cv.hoten AS cvht_name
+             FROM sinhvien_lop sl
+             INNER JOIN lop l ON sl.mslop = l.mslop
+             INNER JOIN khoa k ON l.ms_khoa = k.ms_khoa
+             INNER JOIN hocky h ON sl.ms_hocky = h.ms_hocky
+             LEFT JOIN cvht_lop cl ON l.mslop = cl.mslop AND cl.ms_hocky = sl.ms_hocky
+             LEFT JOIN cvht cv ON cl.ms_cvht = cv.ms_cvht
+             WHERE sl.mssv = ? AND sl.ms_hocky = ?`,
+            [mssv, semesterId]
+        );
+        
+        if (classInfo.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: `Student is not enrolled in any class for ${semesterInfo.display_name || 'the current semester'}`
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                student: student[0],
+                semester: semesterInfo,
+                class: classInfo[0]
+            }
+        });
+    } catch (err) {
+        console.error('Error in getCurrentLopForStudent:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// ========== CHECK IF STUDENT IS ENROLLED IN CURRENT SEMESTER ==========
+isStudentEnrolledNow: async (req, res) => {
+    const { mssv } = req.params;
+    
+    try {
+        // 1. Check if student exists
+        const [student] = await db.query(
+            "SELECT mssv, hoten FROM sinhvien WHERE mssv = ?",
+            [mssv]
+        );
+        
+        if (student.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Student not found'
+            });
+        }
+        
+        // 2. Get current semester
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        
+        const [currentSemester] = await db.query(
+            `SELECT ms_hocky, hocky, nam, ngay_batdau, ngay_ketthuc,
+                    CONCAT('HK', hocky, ' - ', nam) AS display_name
+             FROM hocky 
+             WHERE ? BETWEEN ngay_batdau AND ngay_ketthuc`,
+            [today]
+        );
+        
+        if (currentSemester.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    student: student[0],
+                    is_enrolled: false,
+                    semester: null,
+                    message: 'No active semester found'
+                }
+            });
+        }
+        
+        // 3. Check if student is enrolled in current semester
+        const [enrollment] = await db.query(
+            `SELECT sl.ms_svl, sl.mslop, sl.ms_hocky
+             FROM sinhvien_lop sl
+             WHERE sl.mssv = ? AND sl.ms_hocky = ?`,
+            [mssv, currentSemester[0].ms_hocky]
+        );
+        
+        const isEnrolled = enrollment.length > 0;
+        
+        res.json({
+            success: true,
+            data: {
+                student: student[0],
+                semester: currentSemester[0],
+                is_enrolled: isEnrolled,
+                class_info: isEnrolled ? enrollment[0] : null,
+                message: isEnrolled ? 'Student is enrolled in current semester' : 'Student is not enrolled in current semester'
+            }
+        });
+    } catch (err) {
+        console.error('Error in isStudentEnrolledNow:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// ========== ACTIVITY (HOAT DONG) CRUD ==========
+
+// CREATE new activity
+createHoatDong: async (req, res) => {
+    // Handle both FormData and JSON body
+    const ten = req.body.ten;
+    const msnv = req.body.msnv;
+    const mskhoa = req.body.mskhoa; // Can be array (FormData) or single value (JSON)
+    const diem = req.body.diem;
+    const ghi_chu = req.body.ghi_chu;
+    const thoi_gian_bat_dau = req.body.thoi_gian_bat_dau;
+    const thoi_gian_ket_thuc = req.body.thoi_gian_ket_thuc;
+    const img = req.file ? req.file.filename : null; // Get uploaded filename from multer
+    
+    // Validate required fields
+    if (!ten || !msnv || !diem || !thoi_gian_bat_dau || !thoi_gian_ket_thuc) {
+        return res.status(400).json({
+            success: false,
+            error: 'Required fields: ten, msnv, diem, thoi_gian_bat_dau, thoi_gian_ket_thuc'
+        });
+    }
+    
+    // Normalize mskhoa to array if it's a single value
+    const khoaList = mskhoa ? (Array.isArray(mskhoa) ? mskhoa : [mskhoa]) : [];
+    
+    // Validate that at least one department is selected
+    if (khoaList.length === 0) {
+        return res.status(400).json({
+            success: false,
+            error: 'At least one department must be selected'
+        });
+    }
+    
+    // Validate time logic
+    if (new Date(thoi_gian_ket_thuc) <= new Date(thoi_gian_bat_dau)) {
+        return res.status(400).json({
+            success: false,
+            error: 'End time must be after start time'
+        });
+    }
+    
+    const connection = await db.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        // Check if staff exists
+        const [staff] = await connection.query(
+            "SELECT msnv, hoten FROM nhanvien WHERE msnv = ?",
+            [msnv]
+        );
+        
+        if (staff.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                error: 'Staff not found'
+            });
+        }
+        
+        // Validate all departments exist
+        const [validKhoa] = await connection.query(
+            "SELECT ms_khoa, ten_khoa FROM khoa WHERE ms_khoa IN (?)",
+            [khoaList]
+        );
+        
+        if (validKhoa.length !== khoaList.length) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                error: 'One or more departments not found'
+            });
+        }
+        
+        // Validate diem (must be positive)
+        const diemNum = parseInt(diem) || 0;
+        if (diemNum < 0) {
+            await connection.rollback();
+            return res.status(400).json({
+                success: false,
+                error: 'Diem must be a positive number'
+            });
+        }
+        
+        // Insert new activity
+        const [result] = await connection.query(
+            `INSERT INTO hoat_dong (ten, msnv, img, diem, ghi_chu, thoi_gian_bat_dau, thoi_gian_ket_thuc) 
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [ten, msnv, img, diemNum, ghi_chu || null, thoi_gian_bat_dau, thoi_gian_ket_thuc]
+        );
+        
+        const mshd = result.insertId;
+        
+        // Insert department associations
+        const khoaValues = khoaList.map(ms_khoa => [ms_khoa, mshd]);
+        await connection.query(
+            "INSERT INTO khoa_hoat_dong (ms_khoa, mshd) VALUES ?",
+            [khoaValues]
+        );
+        
+        await connection.commit();
+        
+        // Get the created activity with departments
+        const [newActivity] = await connection.query(
+            `SELECT h.mshd, h.ten, h.msnv, h.img, h.diem, h.ghi_chu, 
+                    h.thoi_gian_bat_dau, h.thoi_gian_ket_thuc, h.created_at,
+                    n.hoten as nhanvien_name, n.username as nhanvien_username
+             FROM hoat_dong h
+             LEFT JOIN nhanvien n ON h.msnv = n.msnv
+             WHERE h.mshd = ?`,
+            [mshd]
+        );
+        
+        // Get associated departments
+        const [activityKhoa] = await connection.query(
+            `SELECT k.ms_khoa, k.ten_khoa 
+             FROM khoa_hoat_dong khd
+             JOIN khoa k ON khd.ms_khoa = k.ms_khoa
+             WHERE khd.mshd = ?`,
+            [mshd]
+        );
+        
+        const activityData = {
+            ...newActivity[0],
+            departments: activityKhoa
+        };
+        
+        res.status(201).json({
+            success: true,
+            message: 'Activity created successfully',
+            data: activityData
+        });
+    } catch (err) {
+        await connection.rollback();
+        console.error('Error in createHoatDong:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    } finally {
+        connection.release();
+    }
+},
+
+// UPDATE activity
+updateHoatDong: async (req, res) => {
+    const { mshd } = req.params;
+    
+    // Handle both FormData and JSON body
+    const ten = req.body.ten;
+    const msnv = req.body.msnv;
+    const mskhoa = req.body.mskhoa; // Can be array (FormData) or single value (JSON)
+    const diem = req.body.diem;
+    const ghi_chu = req.body.ghi_chu;
+    const thoi_gian_bat_dau = req.body.thoi_gian_bat_dau;
+    const thoi_gian_ket_thuc = req.body.thoi_gian_ket_thuc;
+    const img = req.file ? req.file.filename : undefined; // undefined means don't update image
+    
+    // Validate at least one field to update
+    if (ten === undefined && msnv === undefined && mskhoa === undefined && 
+        img === undefined && diem === undefined && ghi_chu === undefined &&
+        thoi_gian_bat_dau === undefined && thoi_gian_ket_thuc === undefined) {
+        return res.status(400).json({
+            success: false,
+            error: 'At least one field is required to update'
+        });
+    }
+    
+    const connection = await db.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        // Check if activity exists
+        const [existing] = await connection.query(
+            "SELECT * FROM hoat_dong WHERE mshd = ?",
+            [mshd]
+        );
+        
+        if (existing.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({
+                success: false,
+                error: 'Activity not found'
+            });
+        }
+        
+        // Validate time logic if both times are provided
+        const batDau = thoi_gian_bat_dau || existing[0].thoi_gian_bat_dau;
+        const ketThuc = thoi_gian_ket_thuc || existing[0].thoi_gian_ket_thuc;
+        
+        if (new Date(ketThuc) <= new Date(batDau)) {
+            await connection.rollback();
+            return res.status(400).json({
+                success: false,
+                error: 'End time must be after start time'
+            });
+        }
+        
+        // Build update query for hoat_dong
+        const updates = [];
+        const values = [];
+        
+        if (ten !== undefined) {
+            updates.push('ten = ?');
+            values.push(ten);
+        }
+        
+        if (msnv !== undefined) {
+            // Check if staff exists
+            const [staff] = await connection.query(
+                "SELECT msnv FROM nhanvien WHERE msnv = ?",
+                [msnv]
+            );
+            
+            if (staff.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({
+                    success: false,
+                    error: 'Staff not found'
+                });
+            }
+            
+            updates.push('msnv = ?');
+            values.push(msnv);
+        }
+        
+       if (img !== undefined) {
+    // If there's a new image and an old image exists, delete old one
+    if (img && existing[0].img) {
+        const oldImagePath = path.join(__dirname, '..', '..', 'uploads', existing[0].img);
+        if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+        }
+    }
+    updates.push('img = ?');
+    values.push(img || null);
+}
+        
+        if (diem !== undefined) {
+            const diemNum = parseInt(diem) || 0;
+            if (diemNum < 0) {
+                await connection.rollback();
+                return res.status(400).json({
+                    success: false,
+                    error: 'Diem must be a positive number'
+                });
+            }
+            updates.push('diem = ?');
+            values.push(diemNum);
+        }
+        
+        if (ghi_chu !== undefined) {
+            updates.push('ghi_chu = ?');
+            values.push(ghi_chu || null);
+        }
+        
+        if (thoi_gian_bat_dau !== undefined) {
+            updates.push('thoi_gian_bat_dau = ?');
+            values.push(thoi_gian_bat_dau);
+        }
+        
+        if (thoi_gian_ket_thuc !== undefined) {
+            updates.push('thoi_gian_ket_thuc = ?');
+            values.push(thoi_gian_ket_thuc);
+        }
+        
+        // Update activity if there are field changes
+        if (updates.length > 0) {
+            values.push(mshd);
+            await connection.query(
+                `UPDATE hoat_dong SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE mshd = ?`,
+                values
+            );
+        }
+        
+        // Update department associations if provided
+        if (mskhoa !== undefined) {
+            const khoaList = Array.isArray(mskhoa) ? mskhoa : [mskhoa];
+            
+            if (khoaList.length === 0) {
+                await connection.rollback();
+                return res.status(400).json({
+                    success: false,
+                    error: 'At least one department must be selected'
+                });
+            }
+            
+            // Validate all departments exist
+            const [validKhoa] = await connection.query(
+                "SELECT ms_khoa FROM khoa WHERE ms_khoa IN (?)",
+                [khoaList]
+            );
+            
+            if (validKhoa.length !== khoaList.length) {
+                await connection.rollback();
+                return res.status(404).json({
+                    success: false,
+                    error: 'One or more departments not found'
+                });
+            }
+            
+            // Remove existing department associations
+            await connection.query(
+                "DELETE FROM khoa_hoat_dong WHERE mshd = ?",
+                [mshd]
+            );
+            
+            // Insert new department associations
+            const khoaValues = khoaList.map(ms_khoa => [ms_khoa, mshd]);
+            await connection.query(
+                "INSERT INTO khoa_hoat_dong (ms_khoa, mshd) VALUES ?",
+                [khoaValues]
+            );
+        }
+        
+        await connection.commit();
+        
+        // Get updated activity
+        const [updated] = await connection.query(
+            `SELECT h.mshd, h.ten, h.msnv, h.img, h.diem, h.ghi_chu,
+                    h.thoi_gian_bat_dau, h.thoi_gian_ket_thuc, h.created_at, h.updated_at,
+                    n.hoten as nhanvien_name, n.username as nhanvien_username
+             FROM hoat_dong h
+             LEFT JOIN nhanvien n ON h.msnv = n.msnv
+             WHERE h.mshd = ?`,
+            [mshd]
+        );
+        
+        // Get associated departments
+        const [activityKhoa] = await connection.query(
+            `SELECT k.ms_khoa, k.ten_khoa 
+             FROM khoa_hoat_dong khd
+             JOIN khoa k ON khd.ms_khoa = k.ms_khoa
+             WHERE khd.mshd = ?`,
+            [mshd]
+        );
+        
+        const activityData = {
+            ...updated[0],
+            departments: activityKhoa
+        };
+        
+        res.json({
+            success: true,
+            message: 'Activity updated successfully',
+            data: activityData
+        });
+    } catch (err) {
+        await connection.rollback();
+        console.error('Error in updateHoatDong:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    } finally {
+        connection.release();
+    }
+},
+
+// GET all activities with departments
+getAllHoatDong: async (req, res) => {
+    try {
+        // Get all activities
+        const [activities] = await db.query(
+            `SELECT h.mshd, h.ten, h.msnv, h.img, h.diem, h.ghi_chu,
+                    h.thoi_gian_bat_dau, h.thoi_gian_ket_thuc, h.created_at, h.updated_at,
+                    n.hoten as nhanvien_name, n.username as nhanvien_username
+             FROM hoat_dong h
+             LEFT JOIN nhanvien n ON h.msnv = n.msnv
+             ORDER BY h.thoi_gian_bat_dau DESC`
+        );
+        
+        // Get departments for all activities
+        const [allKhoa] = await db.query(
+            `SELECT khd.mshd, k.ms_khoa, k.ten_khoa 
+             FROM khoa_hoat_dong khd
+             JOIN khoa k ON khd.ms_khoa = k.ms_khoa`
+        );
+        
+        // Map departments to activities
+        const activitiesWithKhoa = activities.map(activity => ({
+            ...activity,
+            departments: allKhoa.filter(k => k.mshd === activity.mshd)
+        }));
+        
+        res.json({
+            success: true,
+            data: activitiesWithKhoa
+        });
+    } catch (err) {
+        console.error('Error in getAllHoatDong:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// GET activities by department
+getHoatDongByKhoa: async (req, res) => {
+    const { mskhoa } = req.params;
+    
+    try {
+        // Check if department exists
+        const [khoa] = await db.query(
+            "SELECT ms_khoa, ten_khoa FROM khoa WHERE ms_khoa = ?",
+            [mskhoa]
+        );
+        
+        if (khoa.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Department not found'
+            });
+        }
+        
+        // Get activities for this department
+        const [activities] = await db.query(
+            `SELECT h.mshd, h.ten, h.msnv, h.img, h.diem, h.ghi_chu,
+                    h.thoi_gian_bat_dau, h.thoi_gian_ket_thuc, h.created_at, h.updated_at,
+                    n.hoten as nhanvien_name, n.username as nhanvien_username
+             FROM hoat_dong h
+             JOIN khoa_hoat_dong khd ON h.mshd = khd.mshd
+             LEFT JOIN nhanvien n ON h.msnv = n.msnv
+             WHERE khd.ms_khoa = ?
+             ORDER BY h.thoi_gian_bat_dau DESC`,
+            [mskhoa]
+        );
+        
+        // Get departments for all activities
+        const [allKhoa] = await db.query(
+            `SELECT khd.mshd, k.ms_khoa, k.ten_khoa 
+             FROM khoa_hoat_dong khd
+             JOIN khoa k ON khd.ms_khoa = k.ms_khoa
+             WHERE khd.mshd IN (?)`,
+            [activities.map(a => a.mshd)]
+        );
+        
+        // Map departments to activities
+        const activitiesWithKhoa = activities.map(activity => ({
+            ...activity,
+            departments: allKhoa.filter(k => k.mshd === activity.mshd)
+        }));
+        
+        res.json({
+            success: true,
+            data: {
+                khoa: khoa[0],
+                activities: activitiesWithKhoa
+            }
+        });
+    } catch (err) {
+        console.error('Error in getHoatDongByKhoa:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// GET single activity by ID
+getHoatDongById: async (req, res) => {
+    const { mshd } = req.params;
+    
+    try {
+        const [activity] = await db.query(
+            `SELECT h.mshd, h.ten, h.msnv, h.img, h.diem, h.ghi_chu,
+                    h.thoi_gian_bat_dau, h.thoi_gian_ket_thuc, h.created_at, h.updated_at,
+                    n.hoten as nhanvien_name, n.username as nhanvien_username
+             FROM hoat_dong h
+             LEFT JOIN nhanvien n ON h.msnv = n.msnv
+             WHERE h.mshd = ?`,
+            [mshd]
+        );
+        
+        if (activity.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Activity not found'
+            });
+        }
+        
+        // Get associated departments
+        const [activityKhoa] = await db.query(
+            `SELECT k.ms_khoa, k.ten_khoa 
+             FROM khoa_hoat_dong khd
+             JOIN khoa k ON khd.ms_khoa = k.ms_khoa
+             WHERE khd.mshd = ?`,
+            [mshd]
+        );
+        
+        const activityData = {
+            ...activity[0],
+            departments: activityKhoa
+        };
+        
+        res.json({
+            success: true,
+            data: activityData
+        });
+    } catch (err) {
+        console.error('Error in getHoatDongById:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// DELETE activity
+deleteHoatDong: async (req, res) => {
+    const { mshd } = req.params;
+    
+    try {
+        // Check if activity exists
+        const [existing] = await db.query(
+            "SELECT * FROM hoat_dong WHERE mshd = ?",
+            [mshd]
+        );
+        
+        if (existing.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Activity not found'
+            });
+        }
+        
+        // Delete activity
+        await db.query(
+            "DELETE FROM hoat_dong WHERE mshd = ?",
+            [mshd]
+        );
+        
+        res.json({
+            success: true,
+            message: 'Activity deleted successfully',
+            data: {
+                mshd: parseInt(mshd),
+                deleted: true
+            }
+        });
+    } catch (err) {
+        console.error('Error in deleteHoatDong:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+
+
+// GET activity count by staff
+getHoatDongCountByStaff: async (req, res) => {
+    const { msnv } = req.params;
+    
+    try {
+        // Check if staff exists
+        const [staff] = await db.query(
+            "SELECT msnv, hoten FROM nhanvien WHERE msnv = ?",
+            [msnv]
+        );
+        
+        if (staff.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Staff not found'
+            });
+        }
+        
+        const [result] = await db.query(
+            `SELECT COUNT(*) as count, COALESCE(SUM(diem), 0) as total_diem
+             FROM hoat_dong 
+             WHERE msnv = ?`,
+            [msnv]
+        );
+        
+        res.json({
+            success: true,
+            data: {
+                staff: staff[0],
+                activity_count: result[0].count || 0,
+                total_diem: result[0].total_diem || 0
+            }
+        });
+    } catch (err) {
+        console.error('Error in getHoatDongCountByStaff:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// GET activity count by department
+getHoatDongCountByKhoa: async (req, res) => {
+    const { mskhoa } = req.params;
+    
+    try {
+        // Check if department exists
+        const [khoa] = await db.query(
+            "SELECT ms_khoa, ten_khoa FROM khoa WHERE ms_khoa = ?",
+            [mskhoa]
+        );
+        
+        if (khoa.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Department not found'
+            });
+        }
+        
+        const [result] = await db.query(
+            `SELECT COUNT(*) as count, COALESCE(SUM(diem), 0) as total_diem
+             FROM hoat_dong 
+             WHERE mskhoa = ?`,
+            [mskhoa]
+        );
+        
+        res.json({
+            success: true,
+            data: {
+                khoa: khoa[0],
+                activity_count: result[0].count || 0,
+                total_diem: result[0].total_diem || 0
+            }
+        });
+    } catch (err) {
+        console.error('Error in getHoatDongCountByKhoa:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
 
 };
 

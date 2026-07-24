@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageWrapper from '../components/PageWrapper';
 
-const BASE_URL =  'http://localhost:5000';
+const BASE_URL = 'http://localhost:5000';
 
 function TieuchiList() {
   const navigate = useNavigate();
@@ -21,7 +21,8 @@ function TieuchiList() {
   // Form data
   const [formData, setFormData] = useState({
     ten_tieuchi: '',
-    diem: 0
+    diem: 0,
+    type: 0 // 0 = Thưởng, 1 = Phạt
   });
   
   const [warningMessage, setWarningMessage] = useState('');
@@ -33,6 +34,25 @@ function TieuchiList() {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     };
+  };
+
+  // Type options
+  const typeOptions = [
+    { value: 0, label: 'Thưởng' },
+    { value: 1, label: 'Phạt' }
+  ];
+
+  // Get type label
+  const getTypeLabel = (type) => {
+    const option = typeOptions.find(opt => opt.value === type);
+    return option ? option.label : '—';
+  };
+
+  // Get type badge color
+  const getTypeBadgeClass = (type) => {
+    return type === 0 
+      ? 'bg-green-100 text-green-800' 
+      : 'bg-red-100 text-red-800';
   };
 
   // Fetch tieuchis on component mount
@@ -68,7 +88,7 @@ function TieuchiList() {
   // Handle add new tieuchi
   const handleAdd = () => {
     setModalMode('add');
-    setFormData({ ten_tieuchi: '', diem: 0 });
+    setFormData({ ten_tieuchi: '', diem: 0, type: 0 });
     setWarningMessage('You are about to create a new tieuchi. Please fill in all required fields.');
     setShowModal(true);
   };
@@ -79,7 +99,8 @@ function TieuchiList() {
     setSelectedTieuchi(item);
     setFormData({ 
       ten_tieuchi: item.ten_tieuchi,
-      diem: item.diem
+      diem: item.diem,
+      type: item.type !== undefined ? item.type : 0
     });
     setWarningMessage(`You are about to edit tieuchi "${item.ten_tieuchi}".`);
     setShowModal(true);
@@ -116,6 +137,7 @@ function TieuchiList() {
           body = { 
             ten_tieuchi: formData.ten_tieuchi,
             diem: parseInt(formData.diem) || 0,
+            type: parseInt(formData.type) || 0,
             ms_loai: parseInt(ms_loai)
           };
           break;
@@ -125,7 +147,8 @@ function TieuchiList() {
           method = 'PUT';
           body = { 
             ten_tieuchi: formData.ten_tieuchi,
-            diem: parseInt(formData.diem) || 0
+            diem: parseInt(formData.diem) || 0,
+            type: parseInt(formData.type) || 0
           };
           break;
           
@@ -286,13 +309,14 @@ function TieuchiList() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Tieuchi</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hình thức</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {tieuchis.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                       No tieuchi found. Click "Add Tieuchi" to create one.
                     </td>
                   </tr>
@@ -307,6 +331,11 @@ function TieuchiList() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {item.diem || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getTypeBadgeClass(item.type)}`}>
+                          {getTypeLabel(item.type)}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
@@ -391,6 +420,21 @@ function TieuchiList() {
                                 placeholder="Enter diem"
                                 min="0"
                               />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Hình thức *</label>
+                              <select
+                                required
+                                value={formData.type}
+                                onChange={(e) => setFormData({ ...formData, type: parseInt(e.target.value) })}
+                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                              >
+                                {typeOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                           </div>
                         )}

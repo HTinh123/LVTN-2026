@@ -94,6 +94,62 @@ deleteStaff: async (req, res) => {
     }
 },
 
+// ========== GET ALL ADMIN MEMBERS ==========
+getAllAdmins: async (req, res) => {
+    try {
+        const [results] = await db.query(
+            `SELECT msnv, hoten, username, role, created_at 
+             FROM nhanvien 
+             WHERE role = 1  -- Only get admin members
+             ORDER BY created_at DESC`
+        );
+        
+        res.json({
+            success: true,
+            data: results,
+            count: results.length
+        });
+    } catch (err) {
+        console.error('Error in getAllAdmins:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
+// ========== GET SINGLE ADMIN BY ID ==========
+getAdminById: async (req, res) => {
+    const { msnv } = req.params;
+    
+    try {
+        const [results] = await db.query(
+            `SELECT msnv, hoten, username, role, created_at 
+             FROM nhanvien 
+             WHERE msnv = ? AND role = 1`,
+            [msnv]
+        );
+        
+        if (results.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Staff member not found'
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: results[0]
+        });
+    } catch (err) {
+        console.error('Error in getAdminById:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+},
+
 };
 
 module.exports = adminController;

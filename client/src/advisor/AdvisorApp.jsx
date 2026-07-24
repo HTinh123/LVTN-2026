@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
 import AdvisorHeader from '../layout/AdvisorHeader';
 import AdvisorClassList from './AdvisorClassList';
-// import ClassStudentList from './ClassStudentList';
+import ClassStudentList from './ClassStudentList';
+import AdvisorDrlView from './AdvisorDrlView';
 
 function AdvisorApp() {
   const navigate = useNavigate();
@@ -59,7 +60,6 @@ function AdvisorApp() {
               <h2 className="text-2xl font-semibold text-gray-700 mb-4">
                 Welcome, {user.hoten || user.username || 'Advisor'}!
               </h2>
-              
             </div>
           } />
 
@@ -70,12 +70,18 @@ function AdvisorApp() {
             </div>
           } />
 
+          <Route path="/drl/:mssv?" element={
+  <div className="bg-white shadow rounded-lg p-6">
+    <AdvisorDrlView />
+  </div>
+} />
+
           {/* Class Students Route */}
-          {/* <Route path="/classes/:mslop/students" element={
+          <Route path="/classes/:mslop/students" element={
             <div className="bg-white shadow rounded-lg p-6">
               <ClassStudentList />
             </div>
-          } /> */}
+          } />
 
           {/* 404 Route */}
           <Route path="*" element={
@@ -87,7 +93,7 @@ function AdvisorApp() {
                 The page you're looking for doesn't exist.
               </p>
               <button 
-                onClick={() => navigate('/advisor')}
+                onClick={() => navigate('/cvht')}  // ← Changed from /advisor to /cvht
                 className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
               >
                 Go to Dashboard

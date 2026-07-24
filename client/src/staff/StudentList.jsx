@@ -258,6 +258,22 @@ const filterStudents = () => {
     setSelectedClass(e.target.value);
   };
 
+  // Handle modal department change
+  const handleModalDepartmentChange = (e) => {
+    const value = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      ms_khoa: value,
+      lop: ''
+    }));
+
+    if (value) {
+      fetchClassesForModal(value);
+    } else {
+      setModalClasses([]);
+    }
+  };
+
   // Handle semester change
   const handleSemesterChange = (e) => {
     setSelectedSemester(e.target.value);
@@ -320,14 +336,12 @@ const filterStudents = () => {
           break;
 
         case 'add':
-         
-          
           url = `${BASE_URL}/api/auth/student/register`;
           method = 'POST';
           body = JSON.stringify({
             mssv: formData.mssv,
             hoten: formData.hoten,
-            
+            mslop: formData.lop,
           });
           break;
 
@@ -402,11 +416,11 @@ const filterStudents = () => {
       setLoading(false);
     }
   };
-
-  // Navigate to student details
-  const goToDetails = (mssv) => {
-    navigate(`/staff/students/${mssv}`);
-  };
+// Navigate to student details (DiemRenLuyen)
+const goToDetails = (mssv) => {
+  // Navigate to the student's DRL page with the student ID as parameter
+  navigate(`/staff/drl/${mssv}`);
+};
 
   // Format date
   const formatDate = (dateString) => {
@@ -452,17 +466,28 @@ const filterStudents = () => {
             {/* Semester Dropdown */}
             <div className="w-full sm:w-48">
               <label className="block text-sm font-medium text-gray-700">Semester</label>
-              <select
-                value={selectedSemester}
-                onChange={handleSemesterChange}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              >
-                {semesters.map(sem => (
-                  <option key={sem.ms_hocky} value={sem.ms_hocky}>
-                    {sem.display_name || `HK${sem.hocky} - ${sem.nam}`}
-                  </option>
-                ))}
-              </select>
+           <select
+  value={selectedSemester}
+  onChange={handleSemesterChange}
+  className="mt-1 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent "
+>
+  {semesters.length > 0 ? (
+    semesters.map((sem) => {
+      // Format: HK2 (2025 - 2026)
+      const year = sem.nam;
+      const nextYear = year + 1;
+      const displayName =  `HK${sem.hocky} (${year} - ${nextYear})`;
+      
+      return (
+        <option key={sem.ms_hocky} value={sem.ms_hocky}>
+          {displayName}
+        </option>
+      );
+    })
+  ) : (
+    <option value="">No semesters available</option>
+  )}
+</select>
             </div>
 
             {/* Department Dropdown */}
@@ -520,14 +545,19 @@ const filterStudents = () => {
               <button
                 onClick={() => {
                   setModalMode('add');
+                  const initialDepartment = selectedDepartment || '';
                   setFormData({ 
                     mssv: '', 
                     hoten: '', 
-                    ms_khoa: '', 
+                    ms_khoa: initialDepartment,
                     lop: '', 
                     valid_until: '' 
                   });
-                  setModalClasses([]);
+                  if (initialDepartment) {
+                    fetchClassesForModal(initialDepartment);
+                  } else {
+                    setModalClasses([]);
+                  }
                   setShowModal(true);
                 }}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -736,12 +766,41 @@ const filterStudents = () => {
                                 placeholder="Nguyen Van A"
                               />
                             </div>
-                            
-                            
-                            
-                           
-                            
-                           
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Department *</label>
+                              <select
+                                required
+                                value={formData.ms_khoa}
+                                onChange={handleModalDepartmentChange}
+                                className="text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                              >
+                                <option value="">Select department</option>
+                                {departments.map((dept) => (
+                                  <option key={dept.ms_khoa} value={dept.ms_khoa}>
+                                    {dept.ten_khoa}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Class *</label>
+                              <select
+                                required
+                                value={formData.lop}
+                                onChange={(e) => setFormData({ ...formData, lop: e.target.value })}
+                                disabled={!formData.ms_khoa || modalClasses.length === 0}
+                                className={`text-black mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${!formData.ms_khoa || modalClasses.length === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                              >
+                                <option value="">Select class</option>
+                                {modalClasses.map((cls) => (
+                                  <option key={cls.mslop} value={cls.mslop}>
+                                    {cls.mslop}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         )}
                         {modalMode === 'bulk' && (
@@ -770,8 +829,8 @@ const filterStudents = () => {
                       loading ||
                       (modalMode === 'add' && (
                         !formData.mssv || 
-                        !formData.hoten 
-                        
+                        !formData.hoten ||
+                        !formData.lop
                       )) ||
                       (modalMode === 'bulk' && !uploadFile)
                     }

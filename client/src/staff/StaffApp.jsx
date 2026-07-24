@@ -8,6 +8,7 @@ import KhoaList from './KhoaList';
 import DanhmucList from './DanhmucList';
 import LoaiList from './LoaiList';
 import TieuchiList from './TieuchiList';
+import HoatdongList from './HoatdongList';
 
 
 function StaffApp() {
@@ -61,6 +62,9 @@ function StaffApp() {
         break;
         case 'categories':
         navigate('/staff/danhmuc');
+        break;
+        case 'activities':
+        navigate('/staff/hoatdong');
         break;
       default:
         navigate('/staff');
@@ -127,6 +131,16 @@ function StaffApp() {
                   Departments Management
                 </h2>
                 <KhoaList />
+              </div>
+            } />
+
+            {/* Activities Management Route */}
+            <Route path="/hoatdong" element={
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-2xl font-semibold text-gray-700 mb-4">
+                  Activities Management
+                </h2>
+                <HoatdongList />
               </div>
             } />
 
