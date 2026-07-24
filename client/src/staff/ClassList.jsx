@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import PageWrapper from '../components/PageWrapper';
 
-const BASE_URL =  'http://localhost:5000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';;
 
 function ClassList() {
   const [classes, setClasses] = useState([]);
